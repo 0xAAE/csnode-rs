@@ -20,19 +20,32 @@ impl Data {
 
 	pub fn update(&mut self, prop: &HashMap<String, String>) -> bool {
 		let mut updated = false;
-		self.is_set = false;
-		self.port = 0;
 		for (k, v) in prop.iter() {
 			match k.as_str() {
 				"port" => {
-					updated = updated || try_parse(&mut self.port, k, v);
-					if self.port != 0 {
-						self.is_set = true;
+					match v.parse::<u16>() {
+						Err(_) => {
+							//println!("error in {} value: it must be one of {}", k, std::any::type_name::<u16>());
+							if self.is_set {
+								self.is_set = false;
+								updated = true;
+							}
+						}
+						Ok(val) => {
+							if self.port != val {
+								println!("{} is updated: {} -> {}", k, &self.port, &val);
+								self.port = val;
+								updated = true;
+								self.is_set = self.port != 0;
+							}
+						}
 					}
 				}
 				"ip" => {
 					match v.parse::<IpAddr>() {
-						Err(_) => println!("IP addres parse error"),
+						Err(_) => {
+							//println!("IP addres parse error"),
+						}
 						Ok(addr) => {
 							if &self.ip != &addr {
 								self.ip = addr;
@@ -41,9 +54,7 @@ impl Data {
 						}
 					};
 				}
-				_ => {
-					println!("Ignore unknown parameter {}", k);
-				}
+				_ => ()
 			}
 		}
 		updated

@@ -113,9 +113,7 @@ impl Data {
 				"jps_command" => {
 					updated = updated || try_update(&mut self.executor_jps_command, k, v);
 				}
-				_ => {
-					println!("Ignore unknown parameter {}", k);
-				}
+				_ => ()
 			}
 		}
 		updated

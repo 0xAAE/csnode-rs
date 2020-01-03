@@ -33,9 +33,7 @@ impl Data {
 				"max_packet_life_time" => {
 					updated = updated || try_parse(&mut self.packet_ttl, k, v);
 				}
-				_ => {
-					println!("Ignore unknown parameter {}", k);
-				}
+				_ => ()
 			}
 		}
 		updated

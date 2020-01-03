@@ -45,9 +45,7 @@ impl Data {
 				"password" => {
 					updated = updated || try_update(&mut self.password, k, v);
 				}
-				_ => {
-					println!("Ignore unknown parameter {}", k);
-				}
+				_ => ()
 			}
 		}
 		updated

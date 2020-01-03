@@ -1,6 +1,7 @@
 use ini::Ini;
 use std::fmt::Display;
 use std::str::FromStr;
+use std::collections::HashMap;
 
 mod endpoint;
 mod api;
@@ -8,8 +9,6 @@ mod events;
 mod sync;
 mod sql;
 mod conveyer;
-
-use std::collections::HashMap;
 
 pub struct Config {
 	// [params]
@@ -21,6 +20,8 @@ pub struct Config {
 	backward_compatible: bool,
 	min_neighbours: usize,
 	max_neighbours: usize,
+	//connection_bandwidth: usize, // obsolete
+	pub reload_delay_sec: u32, // observer_wait_time
 	restrict_neighbours: bool,
 	broadcast_percent: u32,
 	// [start_node]
@@ -55,6 +56,7 @@ impl Config {
 			max_neighbours: 8,
 			restrict_neighbours: true,
 			broadcast_percent: 100,
+			reload_delay_sec: 10, //5 * 60,
 			start_node: endpoint::Data::new(),
 			host_input: endpoint::Data::new(),
 			sync: sync::Data::new(),
@@ -70,7 +72,7 @@ impl Config {
 		instance
 	}
 
-	fn reload(&mut self) {
+	pub fn reload(&mut self) {
 		let ini = Ini::load_from_file(&self.ini_file).unwrap();
 		for (sec, prop) in ini.iter() {
 			match sec.as_ref().map(String::as_str) {
@@ -115,7 +117,7 @@ impl Config {
 		for (k, v) in prop.iter() {
 			match k.as_str() {
 				"node_type" => {
-					println!("node_type is obsolete and ignored");
+					//println!("node_type is obsolete and ignored");
 				}
 				"hosts_filename" => {
 					updated = updated || try_update(&mut self.hosts_filename, k, v);
@@ -153,14 +155,14 @@ impl Config {
 						}
 					}
 				}
-				_ => {
-					println!("Ignore unknown parameter {}", k);
+				"observer_wait_time" => {
+					updated = updated || try_parse(&mut self.reload_delay_sec, k, v);
 				}
+				_ => ()
 			}
 		}
 		updated
 	}
-
 }
 
 fn try_parse<N: FromStr + PartialEq + Copy + Display>(param: &mut N, key: &String, val: &String) -> bool {

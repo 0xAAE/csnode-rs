@@ -110,9 +110,7 @@ impl Data {
 				"big_bang" => {
 					updated = updated || try_parse(&mut self.big_bang, k, v);
 				}
-				_ => {
-					println!("Ignore unknown parameter {}", k);
-				}
+				_ => ()
 			}
         }
         updated

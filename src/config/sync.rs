@@ -51,9 +51,7 @@ impl Data {
 				"sequences_verification_frequency" => {
 					updated = updated || try_parse(&mut self.update_required_blocks_delay, k, v);
 				}
-				_ => {
-					println!("Ignore unknown parameter {}", k);
-				}
+				_ => ()
 			}
 		}
 		updated
