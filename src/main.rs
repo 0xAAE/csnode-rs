@@ -16,5 +16,5 @@ fn main() {
             };
         }
     }
-    let config = config::Config::new(&file_name);
+    let conf = config::Config::new(&file_name);
 }
