@@ -57,61 +57,61 @@ impl Data {
 		for (k, v) in prop.iter() {
 			match k.as_str() {
 				"port" => {
-					updated = updated || try_parse(&mut self.api_port, k, v);
+					updated = try_parse(&mut self.api_port, k, v) || updated;
 				}
 				"ajax_port" => {
-					updated = updated || try_parse(&mut self.ajax_port, k, v);
+					updated = try_parse(&mut self.ajax_port, k, v) || updated;
 				}
 				"executor_port" => {
-					updated = updated || try_parse(&mut self.executor_port, k, v);
+					updated = try_parse(&mut self.executor_port, k, v) || updated;
 				}
 				"apiexec_port" => {
-					updated = updated || try_parse(&mut self.apiexec_port, k, v);
+					updated = try_parse(&mut self.apiexec_port, k, v) || updated;
 				}
 				"executor_send_timeout" => {
-					updated = updated || try_parse(&mut self.executor_send_timeout, k, v);
+					updated = try_parse(&mut self.executor_send_timeout, k, v) || updated;
 				}
 				"executor_receive_timeout" => {
-					updated = updated || try_parse(&mut self.executor_recv_timeout, k, v);
+					updated = try_parse(&mut self.executor_recv_timeout, k, v) || updated;
 				}
 				"server_send_timeout" => {
-					updated = updated || try_parse(&mut self.server_send_timeout, k, v);
+					updated = try_parse(&mut self.server_send_timeout, k, v) || updated;
 				}
 				"server_receive_timeout" => {
-					updated = updated || try_parse(&mut self.server_recv_timeout, k, v);
+					updated = try_parse(&mut self.server_recv_timeout, k, v) || updated;
 				}
 				"ajax_server_send_timeout" => {
-					updated = updated || try_parse(&mut self.ajax_send_timeout, k, v);
+					updated = try_parse(&mut self.ajax_send_timeout, k, v) || updated;
 				}
 				"ajax_server_receive_timeout" => {
-					updated = updated || try_parse(&mut self.ajax_recv_timeout, k, v);
+					updated = try_parse(&mut self.ajax_recv_timeout, k, v) || updated;
 				}
 				"executor_ip" => {
-					updated = updated || try_update(&mut self.executor_host, k, v);
+					updated = try_update(&mut self.executor_host, k, v) || updated;
 				}
 				"executor_command" => {
-					updated = updated || try_update(&mut self.executor_launch_command, k, v);
+					updated = try_update(&mut self.executor_launch_command, k, v) || updated;
 				}
 				"executor_run_delay" => {
-					updated = updated || try_parse(&mut self.executor_launch_delay, k, v);
+					updated = try_parse(&mut self.executor_launch_delay, k, v) || updated;
 				}
 				"executor_background_thread_delay" => {
-					updated = updated || try_parse(&mut self.executor_observer_delay, k, v);
+					updated = try_parse(&mut self.executor_observer_delay, k, v) || updated;
 				}
 				"executor_check_version_delay" => {
-					updated = updated || try_parse(&mut self.executor_test_delay, k, v);
+					updated = try_parse(&mut self.executor_test_delay, k, v) || updated;
 				}
 				"executor_multi_instance" => {
-					updated = updated || try_parse(&mut self.executor_multi_instance, k, v);
+					updated = try_parse(&mut self.executor_multi_instance, k, v) || updated;
 				}
 				"executor_commit_min" => {
-					updated = updated || try_parse(&mut self.executor_commit_min, k, v);
+					updated = try_parse(&mut self.executor_commit_min, k, v) || updated;
 				}
 				"executor_commit_max" => {
-					updated = updated || try_parse(&mut self.executor_commit_max, k, v);
+					updated = try_parse(&mut self.executor_commit_max, k, v) || updated;
 				}
 				"jps_command" => {
-					updated = updated || try_update(&mut self.executor_jps_command, k, v);
+					updated = try_update(&mut self.executor_jps_command, k, v) || updated;
 				}
 				_ => ()
 			}

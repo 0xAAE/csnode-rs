@@ -34,22 +34,22 @@ impl Data {
 		for (k, v) in prop.iter() {
 			match k.as_str() {
 				"one_reply_block" => {
-					updated = updated || try_parse(&mut self.single_block_reply, k, v);
+					updated = try_parse(&mut self.single_block_reply, k, v) || updated;
 				}
 				"fast_mode" => {
-					updated = updated || try_parse(&mut self.fast_mode, k, v);
+					updated = try_parse(&mut self.fast_mode, k, v) || updated;
 				}
 				"block_pools_count" => {
-					updated = updated || try_parse(&mut self.max_block_request, k, v);
+					updated = try_parse(&mut self.max_block_request, k, v) || updated;
 				}
 				"request_repeat_round_count" => {
-					updated = updated || try_parse(&mut self.request_round_delay, k, v);
+					updated = try_parse(&mut self.request_round_delay, k, v) || updated;
 				}
 				"neighbour_packets_count" => {
-					updated = updated || try_parse(&mut self.max_neighbour_req_count, k, v);
+					updated = try_parse(&mut self.max_neighbour_req_count, k, v) || updated;
 				}
 				"sequences_verification_frequency" => {
-					updated = updated || try_parse(&mut self.update_required_blocks_delay, k, v);
+					updated = try_parse(&mut self.update_required_blocks_delay, k, v) || updated;
 				}
 				_ => ()
 			}

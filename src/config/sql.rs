@@ -31,19 +31,19 @@ impl Data {
 		for (k, v) in prop.iter() {
 			match k.as_str() {
 				"host" => {
-					updated = updated || try_update(&mut self.host, k, v);
+					updated = try_update(&mut self.host, k, v) || updated;
 				}
 				"port" => {
-					updated = updated || try_parse(&mut self.port, k, v);
+					updated = try_parse(&mut self.port, k, v) || updated;
 				}
 				"name" => {
-					updated = updated || try_update(&mut self.name, k, v);
+					updated = try_update(&mut self.name, k, v) || updated;
 				}
 				"user" => {
-					updated = updated || try_update(&mut self.user, k, v);
+					updated = try_update(&mut self.user, k, v) || updated;
 				}
 				"password" => {
-					updated = updated || try_update(&mut self.password, k, v);
+					updated = try_update(&mut self.password, k, v) || updated;
 				}
 				_ => ()
 			}

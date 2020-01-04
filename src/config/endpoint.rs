@@ -1,6 +1,5 @@
-use super::try_parse;
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr};
 
 pub struct Data {
     pub is_set: bool, // = false;
@@ -25,7 +24,7 @@ impl Data {
 				"port" => {
 					match v.parse::<u16>() {
 						Err(_) => {
-							//println!("error in {} value: it must be one of {}", k, std::any::type_name::<u16>());
+							println!("error in {} value: it must be one of u16 type", k);
 							if self.is_set {
 								self.is_set = false;
 								updated = true;
@@ -48,6 +47,7 @@ impl Data {
 						}
 						Ok(addr) => {
 							if &self.ip != &addr {
+								println!("{} is updated: {} -> {}", k, &self.ip, &v);
 								self.ip = addr;
 								updated = true;
 							}

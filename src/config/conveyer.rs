@@ -25,13 +25,13 @@ impl Data {
 		for (k, v) in prop.iter() {
 			match k.as_str() {
 				"send_cache_value" => {
-					updated = updated || try_parse(&mut self.send_cache_delay, k, v);
+					updated = try_parse(&mut self.send_cache_delay, k, v) || updated;
 				}
 				"max_resends_send_cache" => {
-					updated = updated || try_parse(&mut self.max_packet_resends, k, v);
+					updated = try_parse(&mut self.max_packet_resends, k, v) || updated;
 				}
 				"max_packet_life_time" => {
-					updated = updated || try_parse(&mut self.packet_ttl, k, v);
+					updated = try_parse(&mut self.packet_ttl, k, v) || updated;
 				}
 				_ => ()
 			}

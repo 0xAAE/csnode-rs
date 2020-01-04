@@ -73,42 +73,46 @@ impl Config {
 	}
 
 	pub fn reload(&mut self) {
-		let ini = Ini::load_from_file(&self.ini_file).unwrap();
-		for (sec, prop) in ini.iter() {
-			match sec.as_ref().map(String::as_str) {
-				Some("params") => {
-					self.update(prop);
+		match Ini::load_from_file(&self.ini_file) {
+			Ok(ini) => {
+				for (sec, prop) in ini.iter() {
+					match sec.as_ref().map(String::as_str) {
+						Some("params") => {
+							self.update(prop);
+						}
+						Some("start_node") => {
+							self.start_node.update(prop);
+						}
+						Some("host_input") => {
+							self.host_input.update(prop);
+						}
+						Some("api") => {
+							self.api.update(prop);
+						}
+						Some("conveyer") => {
+							self.conveyer.update(prop);
+						}
+						Some("pool_sync") => {
+							self.sync.update(prop);
+						}
+						Some("event_report") => {
+							self.events.update(prop);
+						}
+						Some("dbsql") => {
+							self.sql.update(prop);
+						}
+						//Some("Core") => {},
+						//Some("Sinks.Console") => {}
+						//Some("Sinks.File") => {}
+						//Some("Sinks.Event") => {}
+						Some(_) => {
+							//println!("ignore {} section", val);
+						},
+						None => {}
+					};
 				}
-				Some("start_node") => {
-					self.start_node.update(prop);
-				}
-				Some("host_input") => {
-					self.host_input.update(prop);
-				}
-				Some("api") => {
-					self.api.update(prop);
-				}
-				Some("conveyer") => {
-					self.conveyer.update(prop);
-				}
-				Some("pool_sync") => {
-					self.sync.update(prop);
-				}
-				Some("event_report") => {
-					self.events.update(prop);
-				}
-				Some("dbsql") => {
-					self.sql.update(prop);
-				}
-				//Some("Core") => {},
-				//Some("Sinks.Console") => {}
-				//Some("Sinks.File") => {}
-				//Some("Sinks.Event") => {}
-				Some(val) => {
-					println!("ignore {} section", val);
-				},
-				None => {}
-			};
+			}
+			Err(_) => ()
 		}
 	}
 
@@ -120,31 +124,31 @@ impl Config {
 					//println!("node_type is obsolete and ignored");
 				}
 				"hosts_filename" => {
-					updated = updated || try_update(&mut self.hosts_filename, k, v);
+					updated = try_update(&mut self.hosts_filename, k, v) || updated;
 				}
 				"bootstrap_type" => {
-					updated = updated || try_update(&mut self.bootstrap_type, k, v);
+					updated = try_update(&mut self.bootstrap_type, k, v) || updated;
 				}
 				"ipv6" => {
-					updated = updated || try_parse(&mut self.ipv6, k, v);
+					updated = try_parse(&mut self.ipv6, k, v) || updated;
 				}
 				"min_compatible_version" => {
-					updated = updated || try_parse(&mut self.min_compatible_version, k, v);
+					updated = try_parse(&mut self.min_compatible_version, k, v) || updated;
 				}
 				"compatible_version" => {
-					updated = updated || try_parse(&mut self.backward_compatible, k, v);
+					updated = try_parse(&mut self.backward_compatible, k, v) || updated;
 				}
 				"min_neighbours" => {
-					updated = updated || try_parse(&mut self.min_neighbours, k, v);
+					updated = try_parse(&mut self.min_neighbours, k, v) || updated;
 				}
 				"max_neighbours" => {
-					updated = updated || try_parse(&mut self.max_neighbours, k, v);
+					updated = try_parse(&mut self.max_neighbours, k, v) || updated;
 				}
 				"restrict_neighbours" => {
-					updated = updated || try_parse(&mut self.restrict_neighbours, k, v);
+					updated = try_parse(&mut self.restrict_neighbours, k, v) || updated;
 				}
 				"broadcast_filling_percents" => {
-					let mut tmp: u32 = 0;
+					let mut tmp: u32 = self.broadcast_percent;
 					if try_parse(&mut tmp, k, v) {
 						if tmp <= 100 {
 							self.broadcast_percent = tmp;
@@ -156,19 +160,34 @@ impl Config {
 					}
 				}
 				"observer_wait_time" => {
-					updated = updated || try_parse(&mut self.reload_delay_sec, k, v);
+					updated = try_parse(&mut self.reload_delay_sec, k, v) || updated;
 				}
 				_ => ()
 			}
 		}
 		updated
 	}
+
+}
+
+#[test]
+fn test_update_params() {
+	let mut conf = Config::new("");
+	let mut data = HashMap::<String, String>::new();
+	data.insert("hosts_filename".to_string(), "nodes.txt".to_string());
+	data.insert("bootstrap_type".to_string(), "start_node".to_string());
+	data.insert("min_compatible_version".to_string(), "460".to_string());
+	data.insert("compatible_version".to_string(), "true".to_string());
+
+	assert_eq!(conf.update(&data), true);
+	assert_eq!(conf.update(&data), false);
+	assert_eq!(conf.update(&data), false);
 }
 
 fn try_parse<N: FromStr + PartialEq + Copy + Display>(param: &mut N, key: &String, val: &String) -> bool {
 	match val.parse::<N>() {
 		Err(_) => {
-			println!("error in {} value: it must be one of {}", key, std::any::type_name::<N>());
+			println!("error in {} value: it must be valid for {} type", key, std::any::type_name::<N>());
 		}
 		Ok(val) => {
 			if param != &val {

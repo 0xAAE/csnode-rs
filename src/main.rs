@@ -32,7 +32,7 @@ fn main() {
     let observer_stop = stop_flag.clone();
     let observer_data = conf.clone();
     let config_observer = spawn(move || {
-        let mut wait_sec = 5 * 60;
+        let mut wait_sec;
         loop {
             // get wait seconds
             {

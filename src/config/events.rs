@@ -72,43 +72,43 @@ impl Data {
 		for (k, v) in prop.iter() {
 			match k.as_str() {
 				"consensus_liar" => {
-					updated = updated || try_parse(&mut self.consensus_liar, k, v);
+					updated = try_parse(&mut self.consensus_liar, k, v) || updated;
 				}
 				"consensus_silent" => {
-					updated = updated || try_parse(&mut self.consensus_silent, k, v);
+					updated = try_parse(&mut self.consensus_silent, k, v) || updated;
 				}
 				"consensus_failed" => {
-					updated = updated || try_parse(&mut self.consensus_failed, k, v);
+					updated = try_parse(&mut self.consensus_failed, k, v) || updated;
 				}
 				"contracts_liar" => {
-					updated = updated || try_parse(&mut self.contracts_liar, k, v);
+					updated = try_parse(&mut self.contracts_liar, k, v) || updated;
 				}
 				"contracts_silent" => {
-					updated = updated || try_parse(&mut self.contracts_silent, k, v);
+					updated = try_parse(&mut self.contracts_silent, k, v) || updated;
 				}
 				"contracts_failed" => {
-					updated = updated || try_parse(&mut self.contracts_failed, k, v);
+					updated = try_parse(&mut self.contracts_failed, k, v) || updated;
 				}
 				"add_gray_list" => {
-					updated = updated || try_parse(&mut self.add_to_gray_list, k, v);
+					updated = try_parse(&mut self.add_to_gray_list, k, v) || updated;
 				}
 				"erase_gray_list" => {
-					updated = updated || try_parse(&mut self.erase_from_gray_list, k, v);
+					updated = try_parse(&mut self.erase_from_gray_list, k, v) || updated;
 				}
 				"reject_transaction" => {
-					updated = updated || try_parse(&mut self.reject_transaction, k, v);
+					updated = try_parse(&mut self.reject_transaction, k, v) || updated;
 				}
 				"reject_contract_execution" => {
-					updated = updated || try_parse(&mut self.reject_contract_execution, k, v);
+					updated = try_parse(&mut self.reject_contract_execution, k, v) || updated;
 				}
 				"reject_contract_consensus" => {
-					updated = updated || try_parse(&mut self.reject_contract_consensus, k, v);
+					updated = try_parse(&mut self.reject_contract_consensus, k, v) || updated;
 				}
 				"alarm_invalid_block" => {
-					updated = updated || try_parse(&mut self.alarm_invalid_block, k, v);
+					updated = try_parse(&mut self.alarm_invalid_block, k, v) || updated;
 				}
 				"big_bang" => {
-					updated = updated || try_parse(&mut self.big_bang, k, v);
+					updated = try_parse(&mut self.big_bang, k, v) || updated;
 				}
 				_ => ()
 			}
