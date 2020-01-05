@@ -6,9 +6,6 @@ use std::thread;
 use std::thread::spawn;
 use std::time;
 
-#[derive(Clone)]
-struct SharedConfig(Arc<RwLock<config::Config>>);
-
 fn main() {
     println!("Hello, world!");
 
@@ -27,7 +24,7 @@ fn main() {
     }
 
     let stop_flag = Arc::new(AtomicBool::new(false));
-    let conf = SharedConfig(Arc::new(RwLock::new(config::Config::new(&file_name))));
+    let conf = Arc::new(RwLock::new(config::Config::new(&file_name)));
     // observer thread data:
     let observer_stop = stop_flag.clone();
     let observer_data = conf.clone();
@@ -36,7 +33,7 @@ fn main() {
         loop {
             // get wait seconds
             {
-                let data_guard = observer_data.0.read().unwrap();
+                let data_guard = observer_data.read().unwrap();
                 wait_sec = data_guard.reload_delay_sec;
             }
             let pause = time::Duration::from_secs(wait_sec.into());
@@ -46,7 +43,7 @@ fn main() {
             }
             // reload configuration parameters
             {
-                let mut data_guard = observer_data.0.write().unwrap();
+                let mut data_guard = observer_data.write().unwrap();
                 data_guard.reload();
             }
         }
