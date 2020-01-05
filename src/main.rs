@@ -25,33 +25,41 @@ fn main() {
 
     let stop_flag = Arc::new(AtomicBool::new(false));
     let conf = Arc::new(RwLock::new(config::Config::new(&file_name)));
-    // observer thread data:
-    let observer_stop = stop_flag.clone();
-    let observer_data = conf.clone();
-    let config_observer = spawn(move || {
+    
+    // run observer thread:
+    let config_observer = start_config_observer_thread(conf.clone(), stop_flag.clone());
+
+    // imitate other work: sleep too long and exit
+    thread::sleep(time::Duration::from_secs(20 * 60));
+    stop_flag.store(true, Ordering::SeqCst);
+    config_observer.join().unwrap();
+}
+
+fn start_config_observer_thread(config: Arc<RwLock<config::Config>>, stop_flag: Arc<AtomicBool>) -> std::thread::JoinHandle<()> {
+    let handle = spawn(move || {
         let mut wait_sec;
         loop {
             // get wait seconds
             {
-                let data_guard = observer_data.read().unwrap();
+                let data_guard = config.read().unwrap();
                 wait_sec = data_guard.reload_delay_sec;
+            }
+            // test exit flag before pause
+            if stop_flag.load(Ordering::SeqCst) {
+                break;
             }
             let pause = time::Duration::from_secs(wait_sec.into());
             thread::sleep(pause);
-            if observer_stop.load(Ordering::SeqCst) {
+            // test exit flag before reload config
+            if stop_flag.load(Ordering::SeqCst) {
                 break;
             }
             // reload configuration parameters
             {
-                let mut data_guard = observer_data.write().unwrap();
+                let mut data_guard = config.write().unwrap();
                 data_guard.reload();
             }
         }
-        ()
     });
-
-    // sleep too long and exit
-    thread::sleep(time::Duration::from_secs(20 * 60));
-    stop_flag.store(true, Ordering::SeqCst);
-    config_observer.join().unwrap();
+    handle
 }
