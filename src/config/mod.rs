@@ -2,6 +2,9 @@ use ini::Ini;
 use std::fmt::Display;
 use std::str::FromStr;
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+
+pub type SharedConfig = Arc<RwLock<Config>>;
 
 mod endpoint;
 mod api;
@@ -9,6 +12,7 @@ mod events;
 mod sync;
 mod sql;
 mod conveyer;
+mod logger;
 
 pub struct Config {
 	// [params]
@@ -38,6 +42,8 @@ pub struct Config {
 	events: events::Data,
 	// [dbsql]
 	sql: sql::Data,
+	// logger
+	logger: logger::Data,
 	// source file to read
 	ini_file: String
 }
@@ -64,7 +70,7 @@ impl Config {
 			conveyer: conveyer::Data::new(),
 			events: events::Data::new(),
 			sql: sql::Data::new(),
-
+			logger: logger::Data::new(),
 			ini_file: file_name.to_string()
 		};
 
@@ -101,9 +107,15 @@ impl Config {
 						Some("dbsql") => {
 							self.sql.update(prop);
 						}
-						//Some("Core") => {},
-						//Some("Sinks.Console") => {}
-						//Some("Sinks.File") => {}
+						Some("Core") => {
+							self.logger.update_core(prop);
+						}
+						Some("Sinks.Console") => {
+							self.logger.update_console(prop);
+						}
+						Some("Sinks.File") => {
+							self.logger.update_file(prop);
+						}
 						//Some("Sinks.Event") => {}
 						Some(_) => {
 							//println!("ignore {} section", val);

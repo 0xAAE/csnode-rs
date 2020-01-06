@@ -8,3 +8,5 @@ edition = "2018"
 
 [dependencies]
 rust-ini = "0.13.0"
+log = "0.4"
+log4rs = "0.9.0"

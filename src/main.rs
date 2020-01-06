@@ -1,4 +1,5 @@
 mod config;
+use config::SharedConfig;
 
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,7 +25,7 @@ fn main() {
     }
 
     let stop_flag = Arc::new(AtomicBool::new(false));
-    let conf = Arc::new(RwLock::new(config::Config::new(&file_name)));
+    let conf: SharedConfig = Arc::new(RwLock::new(config::Config::new(&file_name)));
     
     // run observer thread:
     let config_observer = start_config_observer_thread(conf.clone(), stop_flag.clone());
@@ -35,7 +36,7 @@ fn main() {
     config_observer.join().unwrap();
 }
 
-fn start_config_observer_thread(config: Arc<RwLock<config::Config>>, stop_flag: Arc<AtomicBool>) -> std::thread::JoinHandle<()> {
+fn start_config_observer_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> std::thread::JoinHandle<()> {
     let handle = spawn(move || {
         let mut wait_sec;
         loop {
@@ -63,3 +64,5 @@ fn start_config_observer_thread(config: Arc<RwLock<config::Config>>, stop_flag: 
     });
     handle
 }
+
+//fn start_logger_thread()
