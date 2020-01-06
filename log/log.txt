@@ -1,7 +1,3 @@
-2020-01-06 15:59:08 UTC INFO - [node_rs]: Logger started
-2020-01-06 15:59:38 UTC DEBUG - [node_rs::config]: max_neighbours is updated: 8 -> 9
-2020-01-06 15:59:38 UTC DEBUG - [node_rs::config]: broadcast_filling_percents is updated: 98 -> 100
-2020-01-06 16:01:23 UTC - node_rs{ERROR: unexpected '('}INFO{ERROR: unexpected ')'}: Logger started
-2020-01-06 16:02:07 UTC - node_rs(INFO): Logger started
-2020-01-06 16:02:37 UTC - node_rs::config::endpoint(DEBUG): port is updated: 6000 -> 6020
-2020-01-06 16:02:37 UTC - node_rs::config(DEBUG): max_neighbours is updated: 9 -> 8
+2020-01-06 16:56:52 UTC - node_rs(INFO): Logger started
+2020-01-06 16:57:22 UTC - node_rs::config(DEBUG): broadcast_filling_percents is updated: 100 -> 9
+2020-01-06 16:57:42 UTC - node_rs::config(DEBUG): broadcast_filling_percents is updated: 9 -> 99
