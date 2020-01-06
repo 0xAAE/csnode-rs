@@ -43,7 +43,7 @@ pub struct Config {
 	// [dbsql]
 	sql: sql::Data,
 	// logger
-	logger: logger::Data,
+	pub logger: logger::Data,
 	// source file to read
 	ini_file: String
 }

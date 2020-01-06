@@ -1,15 +1,14 @@
 use std::collections::HashMap;
-use super::try_update;
 
 use log::LevelFilter;
 
 pub struct Data {
 	/// min core level
-	min_level: LevelFilter,
+	pub min_level: LevelFilter,
 	/// min output to console level
-	min_console_level: LevelFilter,
+	pub min_console_level: LevelFilter,
 	/// min output to file level
-	min_file_level: LevelFilter
+	pub min_file_level: LevelFilter
 }
 
 impl Data {
@@ -63,43 +62,37 @@ impl Data {
 
 	fn update_level(param: &mut LevelFilter, value: &str) -> bool {
 		let mut updated = false;
-		match Data::try_parse_level(value) {
-			Some(lvl) => {
-				if lvl != *param {
-					println!("filter is updated: {} -> {}", *param, &lvl);
-					*param = lvl;
-					updated = true;				
-				}
+		if let Some(lvl) = Data::try_parse_level(value) {
+			if lvl != *param {
+				println!("filter is updated: {} -> {}", *param, &lvl);
+				*param = lvl;
+				updated = true;				
 			}
-			None => ()
 		}
 		updated
 	}
 
 	fn try_parse_level(v: &str) -> Option<LevelFilter> {
 		let param = "%severity%";
-		match v.to_lowercase().find(param) {
-			Some(index) => {
-				let value = v[index + param.len()..].to_lowercase();
-				if value.contains("trace") {
-					return Some(LevelFilter::Trace);
-				}
-				if value.contains("debug") {
-					return Some(LevelFilter::Debug);
-				}
-				if value.contains("info") {
-					return Some(LevelFilter::Info);
-				}
-				if value.contains("warning") {
-					return Some(LevelFilter::Warn);
-				}
-				if value.contains("error") {
-					return Some(LevelFilter::Error);
-				}
-				return None;
+		if let Some(index) = v.to_lowercase().find(param) {
+			let value = v[index + param.len()..].to_lowercase();
+			if value.contains("trace") {
+				return Some(LevelFilter::Trace);
 			}
-			None => None
+			if value.contains("debug") {
+				return Some(LevelFilter::Debug);
+			}
+			if value.contains("info") {
+				return Some(LevelFilter::Info);
+			}
+			if value.contains("warning") {
+				return Some(LevelFilter::Warn);
+			}
+			if value.contains("error") {
+				return Some(LevelFilter::Error);
+			}
 		}
+		return None;
 	}
 }
 

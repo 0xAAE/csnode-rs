@@ -1,5 +1,10 @@
+extern crate log;
+use log::info;
+
 mod config;
 use config::SharedConfig;
+
+mod logger;
 
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -27,6 +32,9 @@ fn main() {
     let stop_flag = Arc::new(AtomicBool::new(false));
     let conf: SharedConfig = Arc::new(RwLock::new(config::Config::new(&file_name)));
     
+    // init logger
+    logger::init(conf.clone());
+    info!("Logger started");
     // run observer thread:
     let config_observer = start_config_observer_thread(conf.clone(), stop_flag.clone());
 
