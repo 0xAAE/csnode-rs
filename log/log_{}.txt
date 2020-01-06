@@ -1,1 +1,0 @@
-2020-01-06 16:58:55 UTC - node_rs(INFO): Logger started
