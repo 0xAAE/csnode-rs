@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use super::try_parse;
 use super::try_update;
+use std::collections::HashMap;
 
 pub struct Data {
     api_port: u16, // = 9090;

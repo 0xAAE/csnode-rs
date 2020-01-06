@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-
 use log::LevelFilter;
+use log::debug;
+use std::collections::HashMap;
 
 pub struct Data {
 	/// min core level
@@ -64,7 +64,7 @@ impl Data {
 		let mut updated = false;
 		if let Some(lvl) = Data::try_parse_level(value) {
 			if lvl != *param {
-				println!("filter is updated: {} -> {}", *param, &lvl);
+				debug!("filter is updated: {} -> {}", *param, &lvl);
 				*param = lvl;
 				updated = true;				
 			}

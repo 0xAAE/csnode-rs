@@ -1,3 +1,4 @@
+use log::{debug, trace, info, warn};
 use ini::Ini;
 use std::fmt::Display;
 use std::str::FromStr;
@@ -117,8 +118,8 @@ impl Config {
 							self.logger.update_file(prop);
 						}
 						//Some("Sinks.Event") => {}
-						Some(_) => {
-							//println!("ignore {} section", val);
+						Some(s) => {
+							trace!("ignore {} section", s);
 						},
 						None => {}
 					};
@@ -133,7 +134,7 @@ impl Config {
 		for (k, v) in prop.iter() {
 			match k.as_str() {
 				"node_type" => {
-					//println!("node_type is obsolete and ignored");
+					trace!("node_type is obsolete and ignored");
 				}
 				"hosts_filename" => {
 					updated = try_update(&mut self.hosts_filename, k, v) || updated;
@@ -167,7 +168,7 @@ impl Config {
 							updated = true;
 						}
 						else {
-							println!("Value of {} must be in range 0..100", k);
+							info!("Value of {} must be in range 0..100", k);
 						}
 					}
 				}
@@ -199,11 +200,11 @@ fn test_update_params() {
 fn try_parse<N: FromStr + PartialEq + Copy + Display>(param: &mut N, key: &String, val: &String) -> bool {
 	match val.parse::<N>() {
 		Err(_) => {
-			println!("error in {} value: it must be valid for {} type", key, std::any::type_name::<N>());
+			warn!("error in {} value: it must be valid for {} type", key, std::any::type_name::<N>());
 		}
 		Ok(val) => {
 			if param != &val {
-				println!("{} is updated: {} -> {}", key, &param, &val);
+				debug!("{} is updated: {} -> {}", key, &param, &val);
 				*param = val;
 				return true;
 			}
@@ -214,7 +215,7 @@ fn try_parse<N: FromStr + PartialEq + Copy + Display>(param: &mut N, key: &Strin
 
 fn try_update(param: &mut String, key: &String, val: &String) -> bool {
 	if param != val {
-		println!("{} is updated: {} -> {}", key, &param, val);
+		debug!("{} is updated: {} -> {}", key, &param, val);
 		*param = val.to_string();
 		return true;
 	}

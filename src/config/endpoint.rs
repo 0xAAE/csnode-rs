@@ -1,3 +1,4 @@
+use log::{debug, warn};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 
@@ -24,7 +25,7 @@ impl Data {
 				"port" => {
 					match v.parse::<u16>() {
 						Err(_) => {
-							println!("error in {} value: it must be one of u16 type", k);
+							warn!("error in {} value: it must be one of u16 type", k);
 							if self.is_set {
 								self.is_set = false;
 								updated = true;
@@ -32,7 +33,7 @@ impl Data {
 						}
 						Ok(val) => {
 							if self.port != val {
-								println!("{} is updated: {} -> {}", k, &self.port, &val);
+								debug!("{} is updated: {} -> {}", k, &self.port, &val);
 								self.port = val;
 								updated = true;
 								self.is_set = self.port != 0;
@@ -43,11 +44,11 @@ impl Data {
 				"ip" => {
 					match v.parse::<IpAddr>() {
 						Err(_) => {
-							//println!("IP addres parse error"),
+							warn!("IP address parse error");
 						}
 						Ok(addr) => {
 							if &self.ip != &addr {
-								println!("{} is updated: {} -> {}", k, &self.ip, &v);
+								debug!("{} is updated: {} -> {}", k, &self.ip, &v);
 								self.ip = addr;
 								updated = true;
 							}
