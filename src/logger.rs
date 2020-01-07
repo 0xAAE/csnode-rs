@@ -19,7 +19,7 @@ pub fn init(conf: SharedConfig) {
 	let lvl_file = std::cmp::min(data_guard.logger.min_file_level, lvl_core);
 
     let stdout = ConsoleAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{m}")))
+        .encoder(Box::new(PatternEncoder::new("{m}{n}")))
         .build();
 
     let file_pattern = "{d(%Y-%m-%d %H:%M:%S %Z)(utc)} - {M}(({l})): {m}{n}";

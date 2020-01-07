@@ -5,16 +5,17 @@ mod config;
 use config::SharedConfig;
 
 mod logger;
+mod network;
 
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::thread::spawn;
+use std::thread::JoinHandle;
 use std::time;
 
 fn main() {
     println!("Hello, world!");
-
     let mut file_name = "config.ini".to_string();
     for arg in std::env::args().skip(1) {
         if arg.starts_with("--config=") {
@@ -34,18 +35,22 @@ fn main() {
     
     // init logger
     logger::init(conf.clone());
-    info!("Logger started");
-    // run observer thread:
+    // run config observer thread:
     let config_observer = start_config_observer_thread(conf.clone(), stop_flag.clone());
+    // run network thread (which in its turn will start all necessary own threads)
+    let network = start_network_thread(conf.clone(), stop_flag.clone());
 
     // imitate other work: sleep too long and exit
-    thread::sleep(time::Duration::from_secs(20 * 60));
+    thread::sleep(time::Duration::from_secs(30));
     stop_flag.store(true, Ordering::SeqCst);
     config_observer.join().unwrap();
+    network.join().unwrap();
 }
 
-fn start_config_observer_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> std::thread::JoinHandle<()> {
+fn start_config_observer_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
+    info!("Start logger");
     let handle = spawn(move || {
+        info!("Logger started");
         let mut wait_sec;
         loop {
             // get wait seconds
@@ -73,4 +78,20 @@ fn start_config_observer_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>
     handle
 }
 
-//fn start_logger_thread()
+fn start_network_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
+    info!("Start network");
+    let handle = spawn(move || {
+        let net = network::Network::new(config);
+        info!("Network started");
+        loop {
+            thread::sleep(time::Duration::from_secs(2));
+            if stop_flag.load(Ordering::SeqCst) {
+                break;
+            }
+        }
+        info!("Trying to stop network");
+		net.stop();
+        info!("Network stopped");
+    });
+    handle
+}
