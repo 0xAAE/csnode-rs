@@ -32,7 +32,7 @@ pub struct Config {
 	// [start_node]
 	start_node: endpoint::Data,
 	// [host_input]
-	host_input: endpoint::Data,
+	pub host_input: endpoint::Data,
 	// [pool_sync]
 	sync: sync::Data,
 	// [api]

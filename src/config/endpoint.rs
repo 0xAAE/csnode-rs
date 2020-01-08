@@ -4,8 +4,8 @@ use std::net::{IpAddr, Ipv4Addr};
 
 pub struct Data {
     pub is_set: bool, // = false;
-    port: u16, // = 0;
-    ip: std::net::IpAddr // {};
+    pub port: u16, // = 0;
+    pub ip: std::net::IpAddr // {};
 }
 
 impl Data {
