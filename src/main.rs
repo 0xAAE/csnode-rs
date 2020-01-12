@@ -14,6 +14,10 @@ use std::thread::spawn;
 use std::thread::JoinHandle;
 use std::time;
 
+pub const PUBLIC_KEY_SIZE: usize = 32;
+
+pub type PublicKey = [u8; PUBLIC_KEY_SIZE];
+
 fn main() {
     println!("Hello, world!");
     let mut file_name = "config.ini".to_string();
