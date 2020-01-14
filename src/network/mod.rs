@@ -13,6 +13,7 @@ const TEST_STOP_DELAY_SEC: u64 = 2;
 const MAX_FRAGMENT_SIZE: usize = 1024;
 const MAX_FRAGMENT_QUEUE: usize = 1024;
 
+mod packet;
 mod fragment_receiver;
 mod packet_collector;
 

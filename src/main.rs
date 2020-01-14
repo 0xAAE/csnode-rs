@@ -1,4 +1,7 @@
+#[macro_use]
+extern crate bitflags;
 extern crate log;
+
 use log::info;
 
 mod config;
