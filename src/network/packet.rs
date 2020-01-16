@@ -1,6 +1,9 @@
 use super::super::PublicKey;
 use super::super::Hash;
 use super::super::bitflags;
+use super::super::num::Num;
+use std::marker::Sized;
+
 use std::convert::TryInto;
 
 bitflags! {
@@ -50,10 +53,18 @@ pub struct Header {
 // ! https://docs.rs/tokio-byteorder/0.2.0/tokio_byteorder/
 // ! https://stackoverflow.com/questions/29307474/how-can-i-convert-a-buffer-of-a-slice-of-bytes-u8-to-an-integer
 // ! https://doc.rust-lang.org/std/primitive.u16.html#method.from_le_bytes
-fn read_le<'a, T: From<&'a [u8]>>(input: &mut &[u8]) -> T {
-    let (int_bytes, rest) = input.split_at(std::mem::size_of::<T>());
-    *input = rest;
-    T::from_le_bytes(int_bytes.try_into().unwrap())
+// fn read_le<'a, T>(input: &'a mut &[u8]) -> T
+// 	where T: Num + Sized
+// {
+//     let (int_bytes, rest) = input.split_at(std::mem::size_of::<T>());
+//     *input = rest;
+//     T::from_le_bytes(int_bytes.try_into().unwrap())
+// }
+
+fn read_le_u16(input: &mut &[u8]) -> u16 {
+	let (read, rest) = input.split_at(std::mem::size_of::<u16>());
+	*input = rest;
+	u16::from_le_bytes(read.try_into().unwrap())
 }
 
 impl Header {
@@ -68,22 +79,24 @@ impl Header {
 			return None;
 		}
 
-		let mut pos: usize = 0;
-
 		let flags;
-		match Flags::from_bits(u8::from_le_bytes(bytes[pos])) {
+		match Flags::from_bits(bytes[0]) {
 			None => return None,
 			Some(f) => flags = f
 		}
 		
+		let mut pos: usize = 1; // just behind the flags
 		let mut number: u16 = 0;
 		let mut count: u16 = 1;
 		if flags.contains(Flags::F) {
-			number = bytes.read_u16::<LittleEndian>().unwrap();
-			// !todo read from bytes => number, count
+			number = u16::from_le_bytes(bytes[pos..].try_into().unwrap());
+			pos = pos + std::mem::size_of::<u16>();
+			count = u16::from_le_bytes(bytes[pos..].try_into().unwrap());
+			pos = pos + std::mem::size_of::<u16>();
 		}
 
-		// !todo read from bytes => id
+		let id = u64::from_le_bytes(bytes[pos..].try_into().unwrap());
+		pos = pos + std::mem::size_of::<u64>();
 
 		if !flags.contains(Flags::N) {
 			// todo read from bytes => sender_key

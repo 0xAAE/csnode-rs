@@ -11,3 +11,4 @@ rust-ini = "0.13.0"
 log = "0.4"
 log4rs = { version = "0.9.0", features = ["console_appender", "rolling_file_appender", "compound_policy", "fixed_window_roller", "size_trigger", "pattern_encoder", "threshold_filter"] }
 bitflags = "1.2.1"
+num = "0.2.1"

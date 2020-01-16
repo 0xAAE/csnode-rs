@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate bitflags;
 extern crate log;
+extern crate num;
 
 use log::info;
 
