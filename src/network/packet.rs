@@ -1,8 +1,8 @@
 use super::super::PublicKey;
 use super::super::Hash;
 use super::super::bitflags;
-use super::super::num::Num;
-use std::marker::Sized;
+//use super::super::num::Num;
+//use std::marker::Sized;
 
 use std::convert::TryInto;
 
