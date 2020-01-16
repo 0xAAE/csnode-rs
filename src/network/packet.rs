@@ -1,5 +1,7 @@
 use super::super::PublicKey;
+use super::super::Hash;
 use super::super::bitflags;
+use std::convert::TryInto;
 
 bitflags! {
 	struct Flags: u8 {
@@ -36,12 +38,22 @@ fn test_bitflags() {
 }
 
 pub struct Header {
-	flags: u8,
+	flags: Flags,
 	number: u16,
 	count: u16,
 	id: u64,
 	sender: Box<PublicKey>,
-	target: Box<PublicKey>
+	target: Box<PublicKey>,
+	hash: Box<Hash>
+}
+
+// ! https://docs.rs/tokio-byteorder/0.2.0/tokio_byteorder/
+// ! https://stackoverflow.com/questions/29307474/how-can-i-convert-a-buffer-of-a-slice-of-bytes-u8-to-an-integer
+// ! https://doc.rust-lang.org/std/primitive.u16.html#method.from_le_bytes
+fn read_le<'a, T: From<&'a [u8]>>(input: &mut &[u8]) -> T {
+    let (int_bytes, rest) = input.split_at(std::mem::size_of::<T>());
+    *input = rest;
+    T::from_le_bytes(int_bytes.try_into().unwrap())
 }
 
 impl Header {
@@ -55,6 +67,37 @@ impl Header {
 			// illegal header value
 			return None;
 		}
+
+		let mut pos: usize = 0;
+
+		let flags;
+		match Flags::from_bits(u8::from_le_bytes(bytes[pos])) {
+			None => return None,
+			Some(f) => flags = f
+		}
+		
+		let mut number: u16 = 0;
+		let mut count: u16 = 1;
+		if flags.contains(Flags::F) {
+			number = bytes.read_u16::<LittleEndian>().unwrap();
+			// !todo read from bytes => number, count
+		}
+
+		// !todo read from bytes => id
+
+		if !flags.contains(Flags::N) {
+			// todo read from bytes => sender_key
+		}
+
+		if !flags.contains(Flags::B) && !flags.contains(Flags::D) {
+			// todo read from bytes => receiver_key
+		}
+
+		// todo calculate hash of bytes[0..size-1]
+
+		// let mut instance: Header;
+		// instance.flags = flags;
+
 
 		None
 	}
@@ -96,4 +139,9 @@ fn test_valid_len() {
 	assert_eq!(Header::valid_len(f_illegal_2.bits), 0);
 
 	assert_eq!(Header::valid_len(0xFF), 0);
+}
+
+pub struct Packet {
+	header: Header,
+	hash: Hash
 }
