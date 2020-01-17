@@ -33,7 +33,7 @@ impl FragmentReceiver {
 		};
 		if cnt > 0 {
 			info!("{} bytes received", cnt);
-			match Fragment::new(buf.to_vec()) {
+			match Fragment::new(buf[ .. cnt].to_vec()) {
 				Some(f) => {
 					if self.tx.send(f).is_err() {
 						warn!("failed to pass fragment to collector");

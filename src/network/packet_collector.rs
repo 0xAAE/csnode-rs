@@ -26,7 +26,10 @@ impl PacketCollector {
 						info!("get fragment with no payload");
 					}
 					Some(p) => {
-						info!("get fragment with payload of {} bytes", p.len());
+						let frg: String = data.fragment().map_or("single".to_string(), |v| {
+							return format!("{} from {}", v.0, v.1);
+						});
+						info!("get fragment with payload of {} bytes, flags {:?}, {}", p.len(), data.flags(), frg);
 					}
 				}
 			}

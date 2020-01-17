@@ -9,7 +9,7 @@ use std::mem::size_of;
 use std::convert::TryInto;
 
 bitflags! {
-	struct Flags: u8 {
+	pub struct Flags: u8 {
 		const ZERO = 0;
 		// network command
 		const N = 0b0000_0001;
@@ -191,10 +191,9 @@ impl Fragment {
 			return None;
 		}
 
-		let flags;
-		match Flags::from_bits(input[0]) {
+		let flags = match Flags::from_bits(input[0]) {
 			None => return None,
-			Some(f) => flags = f
+			Some(f) => f
 		};
 		let hhash = Box::new(blake2s(&input[ .. hdr_size]));
 		let phash = Box::new(blake2s(&input[ .. ]));
