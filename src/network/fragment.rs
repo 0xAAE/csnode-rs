@@ -1,8 +1,10 @@
 use super::super::PublicKey;
-use super::super::Hash;
+use super::super::PUBLIC_KEY_SIZE;
 use super::super::bitflags;
+use super::super::blake2s_simd::{blake2s, Hash};
 //use super::super::num::Num;
 //use std::marker::Sized;
+use std::mem::size_of;
 
 use std::convert::TryInto;
 
@@ -45,26 +47,19 @@ pub struct Header {
 	number: u16,
 	count: u16,
 	id: u64,
-	sender: Box<PublicKey>,
-	target: Box<PublicKey>,
-	hash: Box<Hash>
+	sender: Option<Box<PublicKey>>,
+	target: Option<Box<PublicKey>>,
+	hash: Hash
 }
 
 // ! https://docs.rs/tokio-byteorder/0.2.0/tokio_byteorder/
 // ! https://stackoverflow.com/questions/29307474/how-can-i-convert-a-buffer-of-a-slice-of-bytes-u8-to-an-integer
 // ! https://doc.rust-lang.org/std/primitive.u16.html#method.from_le_bytes
-// fn read_le<'a, T>(input: &'a mut &[u8]) -> T
-// 	where T: Num + Sized
-// {
-//     let (int_bytes, rest) = input.split_at(std::mem::size_of::<T>());
-//     *input = rest;
-//     T::from_le_bytes(int_bytes.try_into().unwrap())
-// }
 
-fn read_le_u16(input: &mut &[u8]) -> u16 {
-	let (read, rest) = input.split_at(std::mem::size_of::<u16>());
-	*input = rest;
-	u16::from_le_bytes(read.try_into().unwrap())
+fn read_public_key(input: &[u8]) -> Box<PublicKey> {
+	let mut tmp: PublicKey = Default::default();
+	tmp.copy_from_slice(input);
+	Box::new(tmp)
 }
 
 impl Header {
@@ -76,6 +71,10 @@ impl Header {
 		let size = Header::valid_len(bytes[0]);
 		if size == 0 {
 			// illegal header value
+			return None;
+		}
+		if bytes.len() < size {
+			// data too small
 			return None;
 		}
 
@@ -90,29 +89,41 @@ impl Header {
 		let mut count: u16 = 1;
 		if flags.contains(Flags::F) {
 			number = u16::from_le_bytes(bytes[pos..].try_into().unwrap());
-			pos = pos + std::mem::size_of::<u16>();
+			pos += size_of::<u16>();
 			count = u16::from_le_bytes(bytes[pos..].try_into().unwrap());
-			pos = pos + std::mem::size_of::<u16>();
+			pos += size_of::<u16>();
 		}
 
 		let id = u64::from_le_bytes(bytes[pos..].try_into().unwrap());
-		pos = pos + std::mem::size_of::<u64>();
+		pos += size_of::<u64>();
 
+		let mut sender: Option<Box<PublicKey>> = None;
 		if !flags.contains(Flags::N) {
-			// todo read from bytes => sender_key
+			sender = Some(read_public_key(&bytes[pos..]));
+			// let mut tmp: PublicKey = Default::default();
+			// tmp.copy_from_slice(&bytes[pos..]);
+			// sender = Some(Box::new(tmp));
+			pos += PUBLIC_KEY_SIZE;
 		}
 
+		let mut target: Option<Box<PublicKey>> = None;
 		if !flags.contains(Flags::B) && !flags.contains(Flags::D) {
-			// todo read from bytes => receiver_key
+			target = Some(read_public_key(&bytes[pos..]));
+			pos += PUBLIC_KEY_SIZE;
 		}
 
 		// todo calculate hash of bytes[0..size-1]
+		let hash = blake2s(&bytes[..size]);
 
-		// let mut instance: Header;
-		// instance.flags = flags;
-
-
-		None
+		Some(Header {
+			flags: flags,
+			number: number,
+			count: count,
+			id: id,
+			sender: sender,
+			target: target,
+			hash: hash
+		})
 	}
 
 	fn valid_len(flags: u8) -> usize {
@@ -154,7 +165,100 @@ fn test_valid_len() {
 	assert_eq!(Header::valid_len(0xFF), 0);
 }
 
-pub struct Packet {
-	header: Header,
-	hash: Hash
+/// Packet always has valid header, it is garanteed in method new(). There is no way to create Packet with invalid header from Vec<u8>
+pub struct Fragment {
+	bytes: Vec<u8>,
+	// ensure bytes has enough length to safely parse header, is based on bytes[0] value (i.e. flags)
+	header_size: usize,
+	header_hash: Box<Hash>,
+	hash: Box<Hash>
+}
+
+impl Fragment {
+
+	pub fn new(input: Vec<u8>) -> Option<Fragment> {
+		if input.len() == 0 {
+			return None;
+		}
+		// deduce header size from flags
+		let hdr_size = Header::valid_len(input[0]);
+		if hdr_size == 0 {
+			// illegal header flags
+			return None;
+		}
+		if input.len() < hdr_size {
+			// packet is broken
+			return None;
+		}
+
+		let flags;
+		match Flags::from_bits(input[0]) {
+			None => return None,
+			Some(f) => flags = f
+		};
+		let hhash = Box::new(blake2s(&input[ .. hdr_size]));
+		let phash = Box::new(blake2s(&input[ .. ]));
+
+		Some(Fragment {
+			bytes: input,
+			header_size: hdr_size,
+			header_hash: hhash,
+			hash: phash
+		})
+	}
+
+	pub fn flags(&self) -> Flags {
+		Flags::from_bits(self.bytes[0]).unwrap()
+	}
+
+	pub fn fragment(&self) -> Option<(u16, u16)> {
+		if self.flags().contains(Flags::F) {
+			let number = u16::from_le_bytes(self.bytes[1..].try_into().unwrap());
+			let count = u16::from_le_bytes(self.bytes[3..].try_into().unwrap());
+			return Some((number, count));
+		}
+		None
+	}
+
+	pub fn id(&self) -> u64 {
+		let mut pos = 1; // flags
+		if self.flags().contains(Flags::F) {
+			pos += 4; // number + count
+		}
+		u64::from_le_bytes(self.bytes[pos..].try_into().unwrap())
+	}
+
+	pub fn sender(&self) -> Option<&[u8]> {
+		let f = self.flags();
+		if f.contains(Flags::N) {
+			return None; // does not contain sender key
+		}
+		let mut pos = 1 + 8; // flags + id
+		if f.contains(Flags::F) {
+			pos += 4; // number + count
+		}
+		Some(&self.bytes[pos .. pos + PUBLIC_KEY_SIZE])
+	}
+
+	pub fn target(&self) -> Option<&[u8]> {
+		let f = self.flags();
+		if f.contains(Flags::B) || f.contains(Flags::D) {
+			return None; // does not contain target key
+		}
+		let mut pos = 1 + 8; // flags + id
+		if f.contains(Flags::F) {
+			pos += 4; // number + count
+		}
+		if !f.contains(Flags::N) {
+			pos += PUBLIC_KEY_SIZE; // sender
+		}
+		Some(&self.bytes[pos .. pos + PUBLIC_KEY_SIZE])
+	}
+
+	pub fn payload(&self) -> Option<&[u8]> {
+		if self.bytes.len() > self.header_size {
+			return Some(&self.bytes[self.header_size .. ]);
+		}
+		None
+	}
 }

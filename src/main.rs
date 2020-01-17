@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate bitflags;
 extern crate log;
-extern crate num;
+extern crate blake2s_simd;
 
 use log::info;
 
@@ -22,7 +22,7 @@ pub const PUBLIC_KEY_SIZE: usize = 32;
 pub const HASH_SIZE: usize = 32;
 
 pub type PublicKey = [u8; PUBLIC_KEY_SIZE];
-pub type Hash = [u8; HASH_SIZE];
+//pub type Hash = [u8; HASH_SIZE];
 
 fn main() {
     println!("Hello, world!");

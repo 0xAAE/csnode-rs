@@ -13,9 +13,11 @@ const TEST_STOP_DELAY_SEC: u64 = 2;
 const MAX_FRAGMENT_SIZE: usize = 1024;
 const MAX_FRAGMENT_QUEUE: usize = 1024;
 
-mod packet;
+mod fragment;
 mod fragment_receiver;
 mod packet_collector;
+
+use fragment::Fragment;
 
 pub struct Network {
 	recv_thread:		JoinHandle<()>,
@@ -29,7 +31,7 @@ pub struct Network {
 impl Network {
 	pub fn new(conf: SharedConfig) -> Box<Network> {
 		let stop_flag_instance = Arc::new(AtomicBool::new(false));
-		let (tx_fragment, rx_fragment) = sync_channel::<Vec<u8>>(MAX_FRAGMENT_QUEUE);
+		let (tx_fragment, rx_fragment) = sync_channel::<Fragment>(MAX_FRAGMENT_QUEUE);
 		let instance = Box::new(Network {
 			stop_flag: stop_flag_instance.clone(),
 			recv_thread: start_recv(conf.clone(), stop_flag_instance.clone(), tx_fragment),
@@ -51,7 +53,7 @@ impl Network {
 	}
 }
 
-fn start_recv(conf: SharedConfig, stop_flag: Arc<AtomicBool>, tx: SyncSender<Vec<u8>>) -> JoinHandle<()> {
+fn start_recv(conf: SharedConfig, stop_flag: Arc<AtomicBool>, tx: SyncSender<Fragment>) -> JoinHandle<()> {
 	info!("Start fragment receiver");
 	let handle = spawn(move || {
 		info!("Fragment receiver started");
@@ -72,7 +74,7 @@ fn start_recv(conf: SharedConfig, stop_flag: Arc<AtomicBool>, tx: SyncSender<Vec
 	handle
 }
 
-fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx: Receiver<Vec<u8>>) -> JoinHandle<()> {
+fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx: Receiver<Fragment>) -> JoinHandle<()> {
 	info!("Start packet collector");
 	let handle = spawn(move || {
 		info!("Packet collector started");
