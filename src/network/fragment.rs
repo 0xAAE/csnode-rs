@@ -1,10 +1,8 @@
-use super::super::PublicKey;
+//use super::super::PublicKey;
 use super::super::PUBLIC_KEY_SIZE;
-use super::super::bitflags;
+//use super::super::bitflags;
 use super::super::blake2s_simd::{blake2s, Hash};
-//use super::super::num::Num;
-//use std::marker::Sized;
-use std::mem::size_of;
+//use std::mem::size_of;
 
 use std::convert::TryInto;
 
@@ -43,88 +41,88 @@ fn test_bitflags() {
 }
 
 pub struct Header {
-	flags: Flags,
-	number: u16,
-	count: u16,
-	id: u64,
-	sender: Option<Box<PublicKey>>,
-	target: Option<Box<PublicKey>>,
-	hash: Hash
+	// flags: Flags,
+	// number: u16,
+	// count: u16,
+	// id: u64,
+	// sender: Option<Box<PublicKey>>,
+	// target: Option<Box<PublicKey>>,
+	// hash: Hash
 }
 
 // ! https://docs.rs/tokio-byteorder/0.2.0/tokio_byteorder/
 // ! https://stackoverflow.com/questions/29307474/how-can-i-convert-a-buffer-of-a-slice-of-bytes-u8-to-an-integer
 // ! https://doc.rust-lang.org/std/primitive.u16.html#method.from_le_bytes
 
-fn read_public_key(input: &[u8]) -> Box<PublicKey> {
-	let mut tmp: PublicKey = Default::default();
-	tmp.copy_from_slice(input);
-	Box::new(tmp)
-}
+// fn read_public_key(input: &[u8]) -> Box<PublicKey> {
+// 	let mut tmp: PublicKey = Default::default();
+// 	tmp.copy_from_slice(input);
+// 	Box::new(tmp)
+// }
 
 impl Header {
-	pub fn new(bytes: &[u8]) -> Option<Header> {
-		if bytes.len() == 0 {
-			return None;
-		}
-		// deduce header size from flags
-		let size = Header::valid_len(bytes[0]);
-		if size == 0 {
-			// illegal header value
-			return None;
-		}
-		if bytes.len() < size {
-			// data too small
-			return None;
-		}
+	// pub fn new(bytes: &[u8]) -> Option<Header> {
+	// 	if bytes.len() == 0 {
+	// 		return None;
+	// 	}
+	// 	// deduce header size from flags
+	// 	let size = Header::valid_len(bytes[0]);
+	// 	if size == 0 {
+	// 		// illegal header value
+	// 		return None;
+	// 	}
+	// 	if bytes.len() < size {
+	// 		// data too small
+	// 		return None;
+	// 	}
 
-		let flags;
-		match Flags::from_bits(bytes[0]) {
-			None => return None,
-			Some(f) => flags = f
-		}
+	// 	let flags;
+	// 	match Flags::from_bits(bytes[0]) {
+	// 		None => return None,
+	// 		Some(f) => flags = f
+	// 	}
 		
-		let mut pos: usize = 1; // just behind the flags
-		let mut number: u16 = 0;
-		let mut count: u16 = 1;
-		if flags.contains(Flags::F) {
-			number = u16::from_le_bytes(bytes[pos..].try_into().unwrap());
-			pos += size_of::<u16>();
-			count = u16::from_le_bytes(bytes[pos..].try_into().unwrap());
-			pos += size_of::<u16>();
-		}
+	// 	let mut pos: usize = 1; // just behind the flags
+	// 	let mut number: u16 = 0;
+	// 	let mut count: u16 = 1;
+	// 	if flags.contains(Flags::F) {
+	// 		number = u16::from_le_bytes(bytes[pos..].try_into().unwrap());
+	// 		pos += size_of::<u16>();
+	// 		count = u16::from_le_bytes(bytes[pos..].try_into().unwrap());
+	// 		pos += size_of::<u16>();
+	// 	}
 
-		let id = u64::from_le_bytes(bytes[pos..].try_into().unwrap());
-		pos += size_of::<u64>();
+	// 	let id = u64::from_le_bytes(bytes[pos..].try_into().unwrap());
+	// 	pos += size_of::<u64>();
 
-		let mut sender: Option<Box<PublicKey>> = None;
-		if !flags.contains(Flags::N) {
-			sender = Some(read_public_key(&bytes[pos..]));
-			// let mut tmp: PublicKey = Default::default();
-			// tmp.copy_from_slice(&bytes[pos..]);
-			// sender = Some(Box::new(tmp));
-			pos += PUBLIC_KEY_SIZE;
-		}
+	// 	let mut sender: Option<Box<PublicKey>> = None;
+	// 	if !flags.contains(Flags::N) {
+	// 		sender = Some(read_public_key(&bytes[pos..]));
+	// 		// let mut tmp: PublicKey = Default::default();
+	// 		// tmp.copy_from_slice(&bytes[pos..]);
+	// 		// sender = Some(Box::new(tmp));
+	// 		pos += PUBLIC_KEY_SIZE;
+	// 	}
 
-		let mut target: Option<Box<PublicKey>> = None;
-		if !flags.contains(Flags::B) && !flags.contains(Flags::D) {
-			target = Some(read_public_key(&bytes[pos..]));
-			pos += PUBLIC_KEY_SIZE;
-		}
+	// 	let mut target: Option<Box<PublicKey>> = None;
+	// 	if !flags.contains(Flags::B) && !flags.contains(Flags::D) {
+	// 		target = Some(read_public_key(&bytes[pos..]));
+	// 		//pos += PUBLIC_KEY_SIZE;
+	// 	}
 
-		// todo calculate hash of bytes[0..size-1]
-		let hash = blake2s(&bytes[..size]);
+	// 	// todo calculate hash of bytes[0..size-1]
+	// 	let hash = blake2s(&bytes[..size]);
 
-		Some(Header {
-			flags: flags,
-			number: number,
-			count: count,
-			id: id,
-			sender: sender,
-			target: target,
-			hash: hash
-		})
-	}
+	// 	Some(Header {
+	// 		flags: flags,
+	// 		number: number,
+	// 		count: count,
+	// 		id: id,
+	// 		sender: sender,
+	// 		target: target,
+	// 		hash: hash
+	// 	})
+	// }
 
 	fn valid_len(flags: u8) -> usize {
 		match Flags::from_bits(flags) {
@@ -191,9 +189,9 @@ impl Fragment {
 			return None;
 		}
 
-		let flags = match Flags::from_bits(input[0]) {
+		match Flags::from_bits(input[0]) {
 			None => return None,
-			Some(f) => f
+			Some(_) => ()
 		};
 		let hhash = Box::new(blake2s(&input[ .. hdr_size]));
 		let phash = Box::new(blake2s(&input[ .. ]));
