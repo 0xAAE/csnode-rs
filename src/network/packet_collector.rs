@@ -1,22 +1,30 @@
 use super::TEST_STOP_DELAY_SEC;
 use super::fragment::Fragment;
+use super::packet::Packet;
+use super::super::blake2s_simd::Hash;
 
 use log::info;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
+use std::collections::{BTreeSet, HashMap};
+
+type FragmentsCollection = HashMap<Hash, BTreeSet<Fragment>>;
 
 pub struct PacketCollector {
 	rx: Receiver<Fragment>,
-	partial: Vec<Fragment>
+	partial: HashMap<Hash, BTreeSet<Fragment>>,
+	completed: Vec<Packet>
 }
 
 impl PacketCollector {
 
 	pub fn new(rx: Receiver<Fragment>) -> PacketCollector {
-		let partial = Vec::<Fragment>::new();
+		let partial = FragmentsCollection::new();
+		let completed = Vec::<Packet>::new();
 		PacketCollector {
 			rx: rx,
-			partial: partial
+			partial: partial,
+			completed: completed
 		}
 	}
 

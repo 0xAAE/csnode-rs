@@ -14,6 +14,7 @@ const MAX_FRAGMENT_SIZE: usize = 1024;
 const MAX_FRAGMENT_QUEUE: usize = 1024;
 
 mod fragment;
+mod packet;
 mod fragment_receiver;
 mod packet_collector;
 

@@ -3,6 +3,7 @@ use super::super::PUBLIC_KEY_SIZE;
 //use super::super::bitflags;
 use super::super::blake2s_simd::{blake2s, Hash};
 //use std::mem::size_of;
+use std::cmp::Ordering;
 
 use std::convert::TryInto;
 
@@ -271,3 +272,23 @@ impl Fragment {
 		None
 	}
 }
+
+impl Ord for Fragment {
+    fn cmp(&self, other: &Self) -> Ordering {
+		self.fragment().unwrap().0.cmp(&other.fragment().unwrap().0)
+    }
+}
+
+impl PartialOrd for Fragment {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.fragment().unwrap().0.cmp(&other.fragment().unwrap().0))
+    }
+}
+
+impl PartialEq for Fragment {
+    fn eq(&self, other: &Self) -> bool {
+        self.fragment().unwrap().0 == other.fragment().unwrap().0
+    }
+}
+
+impl Eq for Fragment { }
