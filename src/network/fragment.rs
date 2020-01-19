@@ -168,8 +168,9 @@ pub struct Fragment {
 	bytes: Vec<u8>,
 	// ensure bytes has enough length to safely parse header, is based on bytes[0] value (i.e. flags)
 	header_size: usize,
-	header_hash: Box<Hash>,
-	hash: Box<Hash>
+	//header_hash: Box<Hash>,
+	/// Unique identifier of packet containing the fragment. Every fragment of the same packet has the same packet_hash value. Not set if pacjet contains single fragment
+	pack_hash: Option<Box<Hash>>
 }
 
 impl Fragment {
@@ -189,18 +190,29 @@ impl Fragment {
 			return None;
 		}
 
-		match Flags::from_bits(input[0]) {
+		let flags: Flags = match Flags::from_bits(input[0]) {
 			None => return None,
-			Some(_) => ()
+			Some(f) => f
 		};
-		let hhash = Box::new(blake2s(&input[ .. hdr_size]));
-		let phash = Box::new(blake2s(&input[ .. ]));
+		//let hhash = Box::new(blake2s(&input[ .. hdr_size]));
+		let mut pack_hash_begin = 1;
+		if flags.contains(Flags::F) {
+			pack_hash_begin += 4;
+		}
+		let mut pack_hash_end = 1;
+		if ! flags.contains(Flags::N) {
+			pack_hash_end = pack_hash_begin + 8 + PUBLIC_KEY_SIZE; // id + sender
+		}
+		let mut pack_hash = None;
+		if pack_hash_end > pack_hash_begin {
+			pack_hash = Some(Box::new(blake2s(&input[pack_hash_begin .. pack_hash_end])));
+		}
 
 		Some(Fragment {
 			bytes: input,
 			header_size: hdr_size,
-			header_hash: hhash,
-			hash: phash
+			//header_hash: hhash,
+			pack_hash: pack_hash
 		})
 	}
 

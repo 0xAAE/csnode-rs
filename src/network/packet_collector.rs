@@ -6,14 +6,17 @@ use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 pub struct PacketCollector {
-	rx: Receiver<Fragment>
+	rx: Receiver<Fragment>,
+	partial: Vec<Fragment>
 }
 
 impl PacketCollector {
 
 	pub fn new(rx: Receiver<Fragment>) -> PacketCollector {
+		let partial = Vec::<Fragment>::new();
 		PacketCollector {
-			rx: rx
+			rx: rx,
+			partial: partial
 		}
 	}
 
@@ -27,7 +30,7 @@ impl PacketCollector {
 					}
 					Some(p) => {
 						let frg: String = data.fragment().map_or("single".to_string(), |v| {
-							return format!("{} from {}", v.0, v.1);
+							format!("{} from {}", v.0, v.1)
 						});
 						info!("get fragment with payload of {} bytes, flags {:?}, {}", p.len(), data.flags(), frg);
 					}
