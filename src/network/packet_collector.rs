@@ -10,6 +10,15 @@ use std::collections::{BTreeSet, HashMap};
 
 type FragmentsCollection = HashMap<Hash, BTreeSet<Fragment>>;
 
+impl std::hash::Hash for Hash {
+
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		
+        self. id.hash(state);
+        self.phone.hash(state);
+    }
+}
+
 pub struct PacketCollector {
 	rx: Receiver<Fragment>,
 	partial: HashMap<Hash, BTreeSet<Fragment>>,
@@ -37,7 +46,7 @@ impl PacketCollector {
 						info!("get fragment with no payload");
 					}
 					Some(p) => {
-						let frg: String = data.fragment().map_or("single".to_string(), |v| {
+						let frg: String = data.fragmentation().map_or("single".to_string(), |v| {
 							format!("{} from {}", v.0, v.1)
 						});
 						info!("get fragment with payload of {} bytes, flags {:?}, {}", p.len(), data.flags(), frg);

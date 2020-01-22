@@ -169,9 +169,6 @@ pub struct Fragment {
 	bytes: Vec<u8>,
 	// ensure bytes has enough length to safely parse header, is based on bytes[0] value (i.e. flags)
 	header_size: usize,
-	//header_hash: Box<Hash>,
-	/// Unique identifier of packet containing the fragment. Every fragment of the same packet has the same packet_hash value. Not set if pacjet contains single fragment
-	pack_hash: Option<Box<Hash>>
 }
 
 impl Fragment {
@@ -195,25 +192,10 @@ impl Fragment {
 			None => return None,
 			Some(f) => f
 		};
-		//let hhash = Box::new(blake2s(&input[ .. hdr_size]));
-		let mut pack_hash_begin = 1;
-		if flags.contains(Flags::F) {
-			pack_hash_begin += 4;
-		}
-		let mut pack_hash_end = 1;
-		if ! flags.contains(Flags::N) {
-			pack_hash_end = pack_hash_begin + 8 + PUBLIC_KEY_SIZE; // id + sender
-		}
-		let mut pack_hash = None;
-		if pack_hash_end > pack_hash_begin {
-			pack_hash = Some(Box::new(blake2s(&input[pack_hash_begin .. pack_hash_end])));
-		}
 
 		Some(Fragment {
 			bytes: input,
-			header_size: hdr_size,
-			//header_hash: hhash,
-			pack_hash: pack_hash
+			header_size: hdr_size
 		})
 	}
 
@@ -221,7 +203,7 @@ impl Fragment {
 		Flags::from_bits(self.bytes[0]).unwrap()
 	}
 
-	pub fn fragment(&self) -> Option<(u16, u16)> {
+	pub fn fragmentation(&self) -> Option<(u16, u16)> {
 		if self.flags().contains(Flags::F) {
 			let number = u16::from_le_bytes(self.bytes[1..].try_into().unwrap());
 			let count = u16::from_le_bytes(self.bytes[3..].try_into().unwrap());
@@ -230,12 +212,16 @@ impl Fragment {
 		None
 	}
 
-	pub fn id(&self) -> u64 {
+	pub fn id(&self) -> Option<u64> {
+		let flags = self.flags();
+		if flags.contains(Flags::N) {
+			return None;
+		}
 		let mut pos = 1; // flags
-		if self.flags().contains(Flags::F) {
+		if flags.contains(Flags::F) {
 			pos += 4; // number + count
 		}
-		u64::from_le_bytes(self.bytes[pos..].try_into().unwrap())
+		Some(u64::from_le_bytes(self.bytes[pos..].try_into().unwrap()))
 	}
 
 	pub fn sender(&self) -> Option<&[u8]> {
@@ -275,20 +261,34 @@ impl Fragment {
 
 impl Ord for Fragment {
     fn cmp(&self, other: &Self) -> Ordering {
-		self.fragment().unwrap().0.cmp(&other.fragment().unwrap().0)
+		self.fragmentation().unwrap().0.cmp(&other.fragmentation().unwrap().0)
     }
 }
 
 impl PartialOrd for Fragment {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.fragment().unwrap().0.cmp(&other.fragment().unwrap().0))
+        Some(self.fragmentation().unwrap().0.cmp(&other.fragmentation().unwrap().0))
     }
 }
 
 impl PartialEq for Fragment {
     fn eq(&self, other: &Self) -> bool {
-        self.fragment().unwrap().0 == other.fragment().unwrap().0
+        self.fragmentation().unwrap().0 == other.fragmentation().unwrap().0
     }
 }
 
 impl Eq for Fragment { }
+
+impl std::hash::Hash for Fragment {
+
+	// identified by fragment number
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		match self.fragmentation() {
+			Some(f) => {
+				f.0.hash(state);
+			},
+			None => ()
+		}
+	}
+	
+}
