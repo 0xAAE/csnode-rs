@@ -188,9 +188,9 @@ impl Fragment {
 			return None;
 		}
 
-		let flags: Flags = match Flags::from_bits(input[0]) {
+		match Flags::from_bits(input[0]) {
 			None => return None,
-			Some(f) => f
+			Some(f) => ()
 		};
 
 		Some(Fragment {

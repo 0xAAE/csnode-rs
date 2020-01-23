@@ -1,34 +1,39 @@
 use super::TEST_STOP_DELAY_SEC;
 use super::fragment::Fragment;
 use super::packet::Packet;
-use super::super::blake2s_simd::Hash;
+use super::super::PublicKey;
 
 use log::info;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use std::collections::{BTreeSet, HashMap};
 
-type FragmentsCollection = HashMap<Hash, BTreeSet<Fragment>>;
+#[derive(std::hash::Hash, std::cmp::Eq)]
+struct PacketUnique {
+	id: u64,
+	sender: PublicKey
+}
 
-impl std::hash::Hash for Hash {
-
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		
-        self. id.hash(state);
-        self.phone.hash(state);
+impl PartialEq for PacketUnique {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && self.sender == other.sender
     }
 }
 
+/// store uncompleted packets fragments: for every different packet accumulates all unique fragments;
+/// when all fragments of some packet has got move it to completed
+type PartialFragmentsCollection = HashMap<PacketUnique, BTreeSet<Fragment>>;
+
 pub struct PacketCollector {
 	rx: Receiver<Fragment>,
-	partial: HashMap<Hash, BTreeSet<Fragment>>,
+	partial: PartialFragmentsCollection,
 	completed: Vec<Packet>
 }
 
 impl PacketCollector {
 
 	pub fn new(rx: Receiver<Fragment>) -> PacketCollector {
-		let partial = FragmentsCollection::new();
+		let partial = PartialFragmentsCollection::new();
 		let completed = Vec::<Packet>::new();
 		PacketCollector {
 			rx: rx,

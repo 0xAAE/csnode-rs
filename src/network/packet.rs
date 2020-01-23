@@ -1,7 +1,9 @@
 use super::fragment::{Flags, Fragment};
 //use super::super::PUBLIC_KEY_SIZE;
 use super::super::PublicKey;
+use super::super::ZERO_PUBLIC_KEY;
 //use super::super::blake2s_simd::Hash;
+use std::convert::TryInto;
 
 use std::collections::BTreeSet;
 
@@ -30,19 +32,23 @@ impl Packet {
 			None => 0,
 			Some(v) => v
 		};
-		let sender = match first.sender() {
+		let sender: Option<Box<PublicKey>> = match first.sender() {
 			None => None,
-			Some(s) => Some(Box::new(s))
+			Some(s) => Some(Box::new(s.try_into().unwrap_or(ZERO_PUBLIC_KEY)))
 		};
-		let target = match first.target() {
+		let target: Option<Box<PublicKey>> = match first.target() {
 			None => None,
-			Some(t) => Some(Box::new(t))
+			Some(t) => Some(Box::new(t.try_into().unwrap_or(ZERO_PUBLIC_KEY)))
 		};
-		// todo calc payload size
-		let mut payload = Vec::<u8>::new();
+		// calc payload size
+		let empty: &[u8] = &[];
+		let mut payload_len = fragments.iter().fold(0, |v, frg| v + frg.payload().unwrap_or(empty).len());
+		// todo add payload bytes
+		let mut payload = Vec::<u8>::with_capacity(payload_len);
 		for f in fragments.iter() {
-			// todo add payload bytes
+			payload.extend(f.payload().unwrap_or(empty));
 		}
+		assert_eq!(payload.len(), payload_len);
 		
 		Some(Packet {
 			flags: flags,

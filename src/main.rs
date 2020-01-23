@@ -24,6 +24,8 @@ pub const HASH_SIZE: usize = 32;
 pub type PublicKey = [u8; PUBLIC_KEY_SIZE];
 //pub type Hash = [u8; HASH_SIZE]; // hash is defined in blake2s
 
+static ZERO_PUBLIC_KEY: PublicKey = [0; PUBLIC_KEY_SIZE];
+
 fn main() {
     println!("Hello, world!");
     let mut file_name = "config.ini".to_string();
