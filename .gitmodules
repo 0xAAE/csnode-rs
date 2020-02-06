@@ -1,0 +1,3 @@
+[submodule "third-party/p2p"]
+	path = third-party/p2p
+	url = https://github.com/SychevS/p2p.git
