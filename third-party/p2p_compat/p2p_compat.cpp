@@ -57,6 +57,9 @@ namespace
             ptr_inst.reset();
         }
     }
+
+    /*static*/
+    std::unique_ptr<HostHandler> HostHandler::ptr_inst;
 }
 
 void host_start() {
