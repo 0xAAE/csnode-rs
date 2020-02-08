@@ -2,6 +2,7 @@
 extern crate bitflags;
 extern crate log;
 extern crate blake2s_simd;
+extern crate csp2p_rs;
 
 use log::info;
 
@@ -25,12 +26,6 @@ pub type PublicKey = [u8; PUBLIC_KEY_SIZE];
 //pub type Hash = [u8; HASH_SIZE]; // hash is defined in blake2s
 
 static ZERO_PUBLIC_KEY: PublicKey = [0; PUBLIC_KEY_SIZE];
-
-#[link(name = "p2p_compat")]
-extern {
-    pub fn host_start();
-    pub fn host_stop();
-}
 
 fn main() {
     println!("Hello, world!");
@@ -58,9 +53,8 @@ fn main() {
     
     // run network thread (which in its turn will start all necessary own threads)
     //let network = start_network_thread(conf.clone(), stop_flag.clone());
-    unsafe {
-        host_start();
-    }
+    let mut host = csp2p_rs::CSHost::new().unwrap();
+    host.start();
 
     // imitate other work: sleep too long and exit
     thread::sleep(time::Duration::from_secs(300));
@@ -68,9 +62,7 @@ fn main() {
     config_observer.join().unwrap();
     
     //network.join().unwrap();
-    unsafe {
-        host_stop()
-    }
+    host.stop();
 }
 
 fn start_config_observer_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
