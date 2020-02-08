@@ -1,3 +1,5 @@
 /target
 **/*.rs.bk
 /log
+/build
+/third-party/p2p_compat/build
