@@ -2,6 +2,7 @@
 extern crate bitflags;
 extern crate log;
 extern crate blake2s_simd;
+extern crate csp2p_rs;
 
 use log::info;
 
@@ -49,14 +50,19 @@ fn main() {
     logger::init(conf.clone());
     // run config observer thread:
     let config_observer = start_config_observer_thread(conf.clone(), stop_flag.clone());
+    
     // run network thread (which in its turn will start all necessary own threads)
-    let network = start_network_thread(conf.clone(), stop_flag.clone());
+    //let network = start_network_thread(conf.clone(), stop_flag.clone());
+    let mut host = csp2p_rs::CSHost::new().unwrap();
+    host.start();
 
     // imitate other work: sleep too long and exit
-    thread::sleep(time::Duration::from_secs(30));
+    thread::sleep(time::Duration::from_secs(300));
     stop_flag.store(true, Ordering::SeqCst);
     config_observer.join().unwrap();
-    network.join().unwrap();
+    
+    //network.join().unwrap();
+    host.stop();
 }
 
 fn start_config_observer_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
