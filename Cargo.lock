@@ -101,6 +101,9 @@ dependencies = [
 [[package]]
 name = "csp2p-rs"
 version = "0.1.0"
+dependencies = [
+ "bitcoin 0.23.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "dtoa"
