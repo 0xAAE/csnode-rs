@@ -60,10 +60,8 @@ fn main() {
     
     // run network (which in its turn will start all necessary own threads)
     let node_key_str = "AAExXjedndkJZrtPpJSX3taw5JB4sjqx32xWWWDnsKUu".to_string();
-    // hex 881730FA0B30985BBDD5F0C0C3A30D9187EFF8CF52C1F94345F39E37E0A9BABA
-    // base58 AAExXjedndkJZrtPpJSX3taw5JB4sjqx32xWWWDnsKUu
-    let mut bytes = base58::from(&node_key_str[..]).unwrap(); // base58 -> Vec<u8>
-    let mut host = csp2p_rs::CSHost::new(&bytes[..]).unwrap();
+    let bytes = base58::from(&node_key_str[..]).unwrap(); // base58 -> Vec<u8>
+    let mut host = CSHost::new(&bytes[..]).unwrap();
     let mut known_hosts = Vec::<NodeInfo>::new();
     known_hosts.push(
         NodeInfo {
