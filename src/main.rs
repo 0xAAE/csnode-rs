@@ -59,9 +59,17 @@ fn main() {
     let config_observer = start_config_observer_thread(conf.clone(), stop_flag.clone());
     
     // run network (which in its turn will start all necessary own threads)
-    let node_key_str = "AAExXjedndkJZrtPpJSX3taw5JB4sjqx32xWWWDnsKUu".to_string();
-    let bytes = base58::from(&node_key_str[..]).unwrap(); // base58 -> Vec<u8>
+    let node_id: String;
+    let hosts_filename: String;
+    {
+        let conf_guard = conf.read().unwrap();
+        node_id = conf_guard.node_id.clone();
+        hosts_filename = conf_guard.hosts_filename.clone();
+    }
+    // init host with own id
+    let bytes = base58::from(&node_id[..]).unwrap(); // base58 -> Vec<u8>
     let mut host = CSHost::new(&bytes[..]).unwrap();
+    // init host entry points list
     let mut known_hosts = Vec::<NodeInfo>::new();
     known_hosts.push(
         NodeInfo {
