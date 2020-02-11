@@ -25,6 +25,11 @@ use std::thread;
 use std::thread::spawn;
 use std::thread::JoinHandle;
 use std::time;
+use std::path::PathBuf;
+use std::fs::File;
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::str::FromStr;
 
 pub const PUBLIC_KEY_SIZE: usize = 32;
 pub const HASH_SIZE: usize = 32;
@@ -35,7 +40,6 @@ pub type PublicKey = [u8; PUBLIC_KEY_SIZE];
 static ZERO_PUBLIC_KEY: PublicKey = [0u8; PUBLIC_KEY_SIZE];
 
 fn main() {
-    println!("Hello, world!");
     let mut file_name = "config.ini".to_string();
     for arg in std::env::args().skip(1) {
         if arg.starts_with("--config=") {
@@ -55,29 +59,28 @@ fn main() {
     
     // init logger
     logger::init(conf.clone());
+
     // run config observer thread:
     let config_observer = start_config_observer_thread(conf.clone(), stop_flag.clone());
     
     // run network (which in its turn will start all necessary own threads)
+
+    // get from config
     let node_id: String;
-    let hosts_filename: String;
+    let mut hosts_filename: String;
     {
         let conf_guard = conf.read().unwrap();
         node_id = conf_guard.node_id.clone();
         hosts_filename = conf_guard.hosts_filename.clone();
     }
+
     // init host with own id
     let bytes = base58::from(&node_id[..]).unwrap(); // base58 -> Vec<u8>
     let mut host = CSHost::new(&bytes[..]).unwrap();
+
     // init host entry points list
     let mut known_hosts = Vec::<NodeInfo>::new();
-    known_hosts.push(
-        NodeInfo {
-            id: base58::from("HBxj19cnpayn46GSqBGyKQXMaLThH4quuPt5gf8aFndg").unwrap(),
-            ip: "195.133.147.58".to_string(),
-            port: 9000
-        }
-    );
+    parse_known_hosts_or_default(&mut known_hosts, &hosts_filename);
     host.add_known_hosts(known_hosts);
     host.start();
 
@@ -136,4 +139,57 @@ fn start_network_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> Joi
         info!("Network stopped");
     });
     handle
+}
+
+fn parse_known_hosts_or_default(known_hosts: &mut Vec<NodeInfo>, hosts_filename: &String) {
+    if hosts_filename.len() > 0 {
+        match File::open(PathBuf::from(&hosts_filename)) {
+            Err(e) => {
+                println!("Failed to open file {}: {}", &hosts_filename, e);
+                // add well known ru3 as entry point
+                known_hosts.push(
+                    NodeInfo {
+                        id: base58::from("HBxj19cnpayn46GSqBGyKQXMaLThH4quuPt5gf8aFndg").unwrap(),
+                        ip: "195.133.147.58".to_string(),
+                        port: 9000
+                    }
+                );
+            }
+            Ok(f) => {
+                let reader = BufReader::new(f);
+                for line in reader.lines() {
+                    match line {
+                        Err(_) => continue,
+                        Ok(item) => {
+                            let parts = item.split_whitespace().collect::<Vec<_>>();
+                            if parts.len() != 2 {
+                                println!("Malformed known_hosts record, must conform <ip:port id>, found {}", item);
+                                continue;
+                            }
+                            let addr = parts[0].split(':').collect::<Vec<_>>();
+                            if addr.len() != 2 {
+                                println!("Malformed ip:port part, found {}", parts[0]);
+                                continue;
+                            }
+                            // base58 -> Vec<u8>
+                            let bytes: Vec<u8> = match base58::from(&parts[1]) {
+                                Err(_) => {
+                                    println!("Malformed id, must be a 32-byte key encoded base58, found {}", parts[1]);
+                                    continue;
+                                }
+                                Ok(b) => b
+                            };
+                            known_hosts.push(
+                                NodeInfo {
+                                    id: bytes,
+                                    ip: addr[0].to_string(),
+                                    port: u16::from_str(addr[1]).unwrap_or(0)
+                                }
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
