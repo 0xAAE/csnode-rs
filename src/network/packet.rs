@@ -1,75 +1,152 @@
-use super::fragment::{Flags, Fragment};
-//use super::super::PUBLIC_KEY_SIZE;
-use super::super::PublicKey;
-use super::super::ZERO_PUBLIC_KEY;
+use super::super::{PublicKey, PUBLIC_KEY_SIZE, ZERO_PUBLIC_KEY};
+//use super::super::bitflags;
 //use super::super::blake2s_simd::Hash;
-use std::convert::TryInto;
+use std::convert::{TryInto, TryFrom};
 
-use std::collections::BTreeSet;
+extern crate csp2p_rs;
+use csp2p_rs::{NodeId, NODE_ID_SIZE};
+
+extern crate num_enum;
+use num_enum::TryFromPrimitive;
+
+bitflags! {
+	pub struct Flags: u8 {
+		const ZERO = 0;
+		// neighbour command
+		const N = 0b0000_0001;
+		// message & Flags::M)
+		const M = 0b0000_0010;
+		// signed
+		const S = 0b0000_0100;
+
+		// signed neighbour command
+		const NS = Self::N.bits | Self::S.bits;
+		// signed message
+		const MS = Self::M.bits | Self::S.bits;
+	}
+}
+
+#[test]
+fn test_bitflags() {
+	let h1 = Flags::N | Flags::S;
+    let h2 = Flags::M | Flags::S;
+    assert_eq!((h1 | h2), Flags::N | Flags::S); // union
+	assert_eq!((h1 & h2), Flags::S); // intersection
+	let h3 = Flags::N | Flags::M | Flags::S;
+    assert_eq!((h3 - h1), Flags::M); // set difference
+	assert_eq!(!h2, Flags::N); // set complement
+	assert_eq!(h1, Flags::NS);
+	assert_eq!(h2, Flags::MS);
+}
+
+// copy of c++ enum
+#[repr(u8)]
+#[derive(Debug, TryFromPrimitive)]
+enum MsgType {
+    BootstrapTable,
+    Transactions,
+    FirstTransaction,
+    NewBlock,
+    BlockHash,
+    BlockRequest,
+    RequestedBlock,
+    FirstStage,
+    SecondStage,
+    ThirdStage,
+    FirstStageRequest,
+    SecondStageRequest,
+    ThirdStageRequest,
+    RoundTableRequest,
+    RoundTableReply,
+    TransactionPacket,
+    TransactionsPacketRequest,
+    TransactionsPacketReply,
+    NewCharacteristic,
+    WriterNotification,
+    FirstSmartStage,
+    SecondSmartStage,
+    RoundTable = 22,
+    ThirdSmartStage,
+    SmartFirstStageRequest,
+    SmartSecondStageRequest,
+    SmartThirdStageRequest,
+    HashReply,
+    RejectedContracts,
+    RoundPackRequest,
+    StateRequest,
+    StateReply,
+    Utility,
+    EmptyRoundPack,
+    BlockAlarm,
+    EventReport,
+    NodeStopRequest = 255
+}
 
 pub struct Packet {
-	flags: Flags,
-	count_fragments: u16,
-	id: u64,
 	sender: Option<Box<PublicKey>>,
-	target: Option<Box<PublicKey>>,
-	payload: Vec<u8>
+	data: Vec<u8>
 }
 
 impl Packet {
 
-	pub fn new(fragments: BTreeSet<Fragment>) -> Option<Packet> {
-		if fragments.is_empty() {
+	pub fn new(id: NodeId, bytes: Vec<u8>) -> Option<Packet> {
+		if bytes.is_empty() {
 			return None;
 		}
-		let first = fragments.iter().nth(0).unwrap();
-		let flags = first.flags();
-		let count = match first.fragmentation() {
-			None => 1,
-			Some(frg) => frg.1
-		};
-		let id = match first.id() {
-			None => 0,
-			Some(v) => v
-		};
-		let sender: Option<Box<PublicKey>> = match first.sender() {
-			None => None,
-			Some(s) => Some(Box::new(s.try_into().unwrap_or(ZERO_PUBLIC_KEY)))
-		};
-		let target: Option<Box<PublicKey>> = match first.target() {
-			None => None,
-			Some(t) => Some(Box::new(t.try_into().unwrap_or(ZERO_PUBLIC_KEY)))
-		};
-		// calc payload size
-		let empty: &[u8] = &[];
-		let mut payload_len = fragments.iter().fold(0, |v, frg| v + frg.payload().unwrap_or(empty).len());
-		// todo add payload bytes
-		let mut payload = Vec::<u8>::with_capacity(payload_len);
-		for f in fragments.iter() {
-			payload.extend(f.payload().unwrap_or(empty));
+		let sender: Option<Box<PublicKey>>;
+		if NODE_ID_SIZE == PUBLIC_KEY_SIZE {
+			sender = Some(Box::new(id));
 		}
-		assert_eq!(payload.len(), payload_len);
-		
+		else {
+			sender = None;
+		}
 		Some(Packet {
-			flags: flags,
-			count_fragments: count,
-			id: id,
 			sender: sender,
-			target: target,
-			payload: payload
+			data: bytes
 		})
 	}
 
-}
+	pub fn is_message(&self) -> bool {
+		if self.data.len() == 0 {
+			return false;
+		}
+		check_flag(self.data[0], Flags::M)
+	}
 
-impl std::hash::Hash for Packet {
+	pub fn is_neigbour(&self) -> bool {
+		if self.data.len() == 0 {
+			return false;
+		}
+		check_flag(self.data[0], Flags::N)
+	}
 
-	// identified by (id, sender)
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		self.id.hash(state);
-		if self.sender != None {
-			self.sender.hash(state);
+	pub fn is_signed(&self) -> bool {
+		if self.data.len() == 0 {
+			return false;
+		}
+		check_flag(self.data[0], Flags::S)
+	}
+
+	pub fn msg_type(&self) -> Option<MsgType> {
+		if self.data.len() < 2 {
+			return None;
+		}
+		if !self.is_message() {
+			return None;
+		}
+		match MsgType::try_from(self.data[1]) {
+			Err(_) => None,
+			Ok(m) => Some(m)
 		}
 	}
-	
+
+	// round() -> usize
+	// payload() -> &[u8]
+}
+
+fn check_flag(byte: u8, f: Flags) -> bool {
+	match Flags::from_bits(byte) {
+		None => false,
+		Some(f) => f.contains(f)
+	}
 }
