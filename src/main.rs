@@ -10,8 +10,8 @@ extern crate csp2p_rs;
 use csp2p_rs::CSHost;
 use csp2p_rs::NodeInfo;
 
-extern crate bitcoin;
-use bitcoin::util::base58;
+extern crate base58;
+use base58::FromBase58;
 
 mod config;
 use config::SharedConfig;
@@ -67,7 +67,7 @@ fn main() {
 
     // get from config
     let node_id: String;
-    let mut hosts_filename: String;
+    let hosts_filename: String;
     {
         let conf_guard = conf.read().unwrap();
         node_id = conf_guard.node_id.clone();
@@ -75,7 +75,7 @@ fn main() {
     }
 
     // init host with own id
-    let bytes = base58::from(&node_id[..]).unwrap(); // base58 -> Vec<u8>
+    let bytes = node_id[..].from_base58().unwrap(); // base58 -> Vec<u8>
     let mut host = CSHost::new(&bytes[..]).unwrap();
 
     // init host entry points list
@@ -149,7 +149,7 @@ fn parse_known_hosts_or_default(known_hosts: &mut Vec<NodeInfo>, hosts_filename:
                 // add well known ru3 as entry point
                 known_hosts.push(
                     NodeInfo {
-                        id: base58::from("HBxj19cnpayn46GSqBGyKQXMaLThH4quuPt5gf8aFndg").unwrap(),
+                        id: "HBxj19cnpayn46GSqBGyKQXMaLThH4quuPt5gf8aFndg".from_base58().unwrap(),
                         ip: "195.133.147.58".to_string(),
                         port: 9000
                     }
@@ -172,7 +172,7 @@ fn parse_known_hosts_or_default(known_hosts: &mut Vec<NodeInfo>, hosts_filename:
                                 continue;
                             }
                             // base58 -> Vec<u8>
-                            let bytes: Vec<u8> = match base58::from(&parts[1]) {
+                            let bytes: Vec<u8> = match parts[1].from_base58() {
                                 Err(_) => {
                                     println!("Malformed id, must be a 32-byte key encoded base58, found {}", parts[1]);
                                     continue;
