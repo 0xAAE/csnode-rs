@@ -80,7 +80,7 @@ impl Network {
 	}
 }
 
-fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx: Receiver<Packet>) -> JoinHandle<()> {
+fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx: Receiver<Vec<u8>>>) -> JoinHandle<()> {
 	info!("Start packet collector");
 	let handle = spawn(move || {
 		info!("Packet collector started");
