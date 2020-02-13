@@ -141,6 +141,25 @@ impl Packet {
 	}
 
 	// round() -> usize
+	pub fn round(&self) -> Option<u64> {
+		if self.data.len() < 10 {
+			return None;
+		}
+		if !self.is_message() {
+			return None;
+		}
+		Some(u64::from_le_bytes(self.data[2..].try_into().unwrap()))
+	}
+
+	pub fn payload(&self) -> Option<&[u8]> {
+		if self.data.len() < 11 {
+			return None;
+		}
+		if !self.is_message() {
+			return None;
+		}
+		Some(&self.data[10..])
+	}
 	// payload() -> &[u8]
 }
 
