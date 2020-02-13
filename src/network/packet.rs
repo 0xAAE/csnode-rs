@@ -2,6 +2,7 @@ use super::super::{PublicKey, PUBLIC_KEY_SIZE, ZERO_PUBLIC_KEY};
 //use super::super::bitflags;
 //use super::super::blake2s_simd::Hash;
 use std::convert::{TryInto, TryFrom};
+use std::fmt;
 
 extern crate csp2p_rs;
 use csp2p_rs::{NodeId, NODE_ID_SIZE};
@@ -82,6 +83,14 @@ enum MsgType {
     NodeStopRequest = 255
 }
 
+impl fmt::Display for MsgType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        //write!(f, "{:?}", self)
+        // or, alternatively:
+        fmt::Debug::fmt(self, f)
+    }
+}
+
 pub struct Packet {
 	sender: Option<Box<PublicKey>>,
 	data: Vec<u8>
@@ -142,25 +151,29 @@ impl Packet {
 
 	// round() -> usize
 	pub fn round(&self) -> Option<u64> {
-		if self.data.len() < 10 {
+		if !self.is_message() {
 			return None;
 		}
-		if !self.is_message() {
+		if self.data.len() < 10 {
 			return None;
 		}
 		Some(u64::from_le_bytes(self.data[2..].try_into().unwrap()))
 	}
 
 	pub fn payload(&self) -> Option<&[u8]> {
-		if self.data.len() < 11 {
-			return None;
+		if self.is_neigbour() {
+			// neigbour pack: 1 byte + payload
+			if self.data.len() < 2 {
+				return None;
+			}
+			return Some(&self.data[1..]);
 		}
-		if !self.is_message() {
+		// message pack: 1 byte + 1 byte + 8 bytes + payload 
+		if self.data.len() < 11 {
 			return None;
 		}
 		Some(&self.data[10..])
 	}
-	// payload() -> &[u8]
 }
 
 fn check_flag(byte: u8, f: Flags) -> bool {

@@ -1,61 +1,46 @@
 use super::TEST_STOP_DELAY_SEC;
-use super::fragment::Fragment;
 use super::packet::Packet;
-use super::super::PublicKey;
 
-use log::info;
+use log::{info, warn};
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
-use std::collections::{BTreeSet, HashMap};
-
-#[derive(std::hash::Hash, std::cmp::Eq)]
-struct PacketUnique {
-	id: u64,
-	sender: PublicKey
-}
-
-impl PartialEq for PacketUnique {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id && self.sender == other.sender
-    }
-}
-
-/// store uncompleted packets fragments: for every different packet accumulates all unique fragments;
-/// when all fragments of some packet has got move it to completed
-type PartialFragmentsCollection = HashMap<PacketUnique, BTreeSet<Fragment>>;
 
 pub struct PacketCollector {
-	rx: Receiver<Fragment>,
-	partial: PartialFragmentsCollection,
-	completed: Vec<Packet>
+	rx: Receiver<Packet>
 }
 
 impl PacketCollector {
 
-	pub fn new(rx: Receiver<Fragment>) -> PacketCollector {
-		let partial = PartialFragmentsCollection::new();
-		let completed = Vec::<Packet>::new();
+	pub fn new(receiver: Receiver<Packet>) -> PacketCollector {
 		PacketCollector {
-			rx: rx,
-			partial: partial,
-			completed: completed
+			rx: receiver
 		}
 	}
 
 	pub fn recv(&self) {
 		match self.rx.recv_timeout(Duration::from_secs(TEST_STOP_DELAY_SEC)) {
 			Err(_) => (),
-			Ok(data) => {
-				match data.payload() {
-					None => {
-						info!("get fragment with no payload");
-					}
-					Some(p) => {
-						let frg: String = data.fragmentation().map_or("single".to_string(), |v| {
-							format!("{} from {}", v.0, v.1)
-						});
-						info!("get fragment with payload of {} bytes, flags {:?}, {}", p.len(), data.flags(), frg);
-					}
+			Ok(pack) => {
+				if pack.is_neigbour() {
+					info!("get neigbour packet, payload size: {}", pack.payload().unwrap_or_default().len());
+				}
+				else if pack.is_message() {
+					let mt = match pack.msg_type() {
+						None => "Unknown".to_string(),
+						Some(v) => v.to_string()
+					};
+					let r = match pack.round() {
+						None => "Unset".to_string(),
+						Some(v) => v.to_string()
+					};
+					let plen = match pack.payload() {
+						None => "None".to_string(),
+						Some(v) => v.len().to_string()
+					};
+					info!("get message packet {} from round {} with payload of {} bytes", mt, r, plen);
+				}
+				else {
+					warn!("get strange packet, neither neigbour, nor message");
 				}
 			}
 		}
