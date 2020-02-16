@@ -1,4 +1,4 @@
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
 use log::{info, warn};
@@ -17,10 +17,10 @@ pub struct CommandProcessor {
 
 impl CommandProcessor {
 
-    pub fn new(conf: SharedConfig, rx_cmd: Receiver<Packet>) -> CommandProcessor {
+    pub fn new(conf: SharedConfig, rx_cmd: Receiver<Packet>, tx_send: Sender<Packet>) -> CommandProcessor {
         CommandProcessor {
             rx_cmd: rx_cmd,
-            collaboration: Collaboration::new(conf)
+            collaboration: Collaboration::new(conf, tx_send)
         }
     }
 

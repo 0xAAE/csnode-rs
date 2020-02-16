@@ -4,7 +4,7 @@ use std::thread::{JoinHandle, spawn};
 use std::time;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{channel, sync_channel, Receiver, SyncSender};
+use std::sync::mpsc::{channel, sync_channel, Receiver, SyncSender, Sender};
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::prelude::*;
@@ -35,7 +35,7 @@ pub struct Network {
 	collect_thread:		JoinHandle<()>,
 	neighbours_thread: 	JoinHandle<()>,
 	processor_thread:	JoinHandle<()>,
-	send_thread:		JoinHandle<()>,
+	sender_thread:		JoinHandle<()>,
 	stop_flag: Arc<AtomicBool>
 }
 
@@ -48,6 +48,8 @@ impl Network {
         let (tx_cmd, rx_cmd) = sync_channel::<Packet>(MAX_CMD_QUEUE);
         // packet_collector -> msg_processor channel, may drop excess messages
         let (tx_msg, rx_msg) = sync_channel::<Packet>(MAX_MSG_QUEUE);
+        // neighbourhood, msg_processor -> packet_sender
+        let (tx_send, rx_send) = channel::<Packet>();
 
 		// start p2p-compat CSHost
 
@@ -73,9 +75,9 @@ impl Network {
 		let instance = Box::new(Network {
 			stop_flag: stop_flag_instance.clone(),
 			collect_thread: start_collect(conf.clone(), stop_flag_instance.clone(), rx_raw, tx_cmd, tx_msg),
-			neighbours_thread: start_neighbourhood(conf.clone(), stop_flag_instance.clone(), rx_cmd),
-			processor_thread: start_msg_processor(conf.clone(), stop_flag_instance.clone(), rx_msg),
-			send_thread: start_send(conf.clone(), stop_flag_instance.clone())
+			neighbours_thread: start_neighbourhood(conf.clone(), stop_flag_instance.clone(), rx_cmd, tx_send.clone()),
+			processor_thread: start_msg_processor(conf.clone(), stop_flag_instance.clone(), rx_msg, tx_send),
+			sender_thread: start_sender(conf.clone(), stop_flag_instance.clone())
 		});
 		instance
 	}
@@ -85,7 +87,7 @@ impl Network {
 		self.collect_thread.join().expect("Failed to stop packet collector");
 		self.neighbours_thread.join().expect("Failed to stop neihbourhood");
 		self.processor_thread.join().expect("Failed to stop message processor");
-		self.send_thread.join().expect("Failed to stop fragment sender");
+		self.sender_thread.join().expect("Failed to stop fragment sender");
 	}
 }
 
@@ -108,11 +110,11 @@ fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>,
 	handle
 }
 
-fn start_neighbourhood(conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: Receiver<Packet>) -> JoinHandle<()> {
+fn start_neighbourhood(conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: Receiver<Packet>, tx_send: Sender<Packet>) -> JoinHandle<()> {
 	info!("Start neighbourhood service");
 	let handle = spawn(move || {
         info!("Neighbourhood started");
-        let neighbourhood = command_processor::CommandProcessor::new(conf.clone(), rx_cmd);
+        let neighbourhood = command_processor::CommandProcessor::new(conf.clone(), rx_cmd, tx_send);
         loop {
             neighbourhood.recv();
             if stop_flag.load(Ordering::SeqCst) {
@@ -124,11 +126,11 @@ fn start_neighbourhood(conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: R
 	handle
 }
 
-fn start_msg_processor(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_msg: Receiver<Packet>) -> JoinHandle<()> {
+fn start_msg_processor(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_msg: Receiver<Packet>, tx_send: Sender<Packet>) -> JoinHandle<()> {
 	info!("Start message processor");
 	let handle = spawn(move || {
         info!("Message processor started");
-        let msg_processor = message_processor::MessageProcessor::new(rx_msg);
+        let msg_processor = message_processor::MessageProcessor::new(_conf.clone(), rx_msg, tx_send);
         loop {
             msg_processor.recv();
             if stop_flag.load(Ordering::SeqCst) {
@@ -140,7 +142,7 @@ fn start_msg_processor(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_msg: 
 	handle
 }
 
-fn start_send(_conf: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
+fn start_sender(_conf: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
 	info!("Start fragment sender");
 	let handle = spawn(move || {
 		info!("Fragment sender started");
