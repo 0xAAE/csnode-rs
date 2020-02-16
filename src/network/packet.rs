@@ -15,29 +15,31 @@ bitflags! {
 		const ZERO = 0;
 		// neighbour command
 		const N = 0b0000_0001;
-		// message & Flags::M)
-		const M = 0b0000_0010;
-		// signed
+		// compressed data
+		const C = 0b0000_0010;
+		// signed data
 		const S = 0b0000_0100;
 
 		// signed neighbour command
 		const NS = Self::N.bits | Self::S.bits;
-		// signed message
-		const MS = Self::M.bits | Self::S.bits;
+		// compressed neighbour command
+		const NC = Self::N.bits | Self::C.bits;
+		// comressed signed message
+		const CS = Self::C.bits | Self::S.bits;
 	}
 }
 
 #[test]
 fn test_bitflags() {
 	let h1 = Flags::N | Flags::S;
-    let h2 = Flags::M | Flags::S;
-    assert_eq!((h1 | h2), Flags::N | Flags::S); // union
+    let h2 = Flags::C | Flags::S;
+    assert_eq!((h1 | h2), Flags::N | Flags::S | Flags::C); // union
 	assert_eq!((h1 & h2), Flags::S); // intersection
-	let h3 = Flags::N | Flags::M | Flags::S;
-    assert_eq!((h3 - h1), Flags::M); // set difference
+	let h3 = Flags::N | Flags::C | Flags::S;
+    assert_eq!((h3 - h1), Flags::C); // set difference
 	assert_eq!(!h2, Flags::N); // set complement
 	assert_eq!(h1, Flags::NS);
-	assert_eq!(h2, Flags::MS);
+	assert_eq!(h2, Flags::CS);
 }
 
 // copy of c++ enum
@@ -91,6 +93,23 @@ impl fmt::Display for MsgType {
     }
 }
 
+// copy of c++ enum
+#[repr(u8)]
+#[derive(Debug, TryFromPrimitive)]
+pub enum NghbrCmd {
+    Error = 1,
+    VersionRequest,
+    VersionReply,
+    Ping,
+    Pong
+}
+
+impl fmt::Display for NghbrCmd {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
+}
+
 pub struct Packet {
 	sender: Option<Box<PublicKey>>,
 	data: Vec<u8>
@@ -116,10 +135,7 @@ impl Packet {
 	}
 
 	pub fn is_message(&self) -> bool {
-		if self.data.len() == 0 {
-			return false;
-		}
-		check_flag(self.data[0], Flags::M)
+		! self.is_neigbour()
 	}
 
 	pub fn is_neigbour(&self) -> bool {
@@ -136,6 +152,13 @@ impl Packet {
 		check_flag(self.data[0], Flags::S)
 	}
 
+	pub fn is_compressed(&self) -> bool {
+		if self.data.len() == 0 {
+			return false;
+		}
+		check_flag(self.data[0], Flags::C)
+	}
+
 	pub fn msg_type(&self) -> Option<MsgType> {
 		if self.data.len() < 2 {
 			return None;
@@ -149,7 +172,19 @@ impl Packet {
 		}
 	}
 
-	// round() -> usize
+	pub fn nghbr_cmd(&self) -> Option<NghbrCmd> {
+		if self.data.len() < 2 {
+			return None;
+		}
+		if ! self.is_neigbour() {
+			return None;
+		}
+		match NghbrCmd::try_from(self.data[1]) {
+			Err(_) => None,
+			Ok(cmd) => Some(cmd)
+		}
+	}
+
 	pub fn round(&self) -> Option<u64> {
 		if !self.is_message() {
 			return None;
@@ -157,18 +192,18 @@ impl Packet {
 		if self.data.len() < 10 {
 			return None;
 		}
-		Some(u64::from_le_bytes(self.data[2..].try_into().unwrap()))
+		Some(u64::from_le_bytes(self.data[2..10].try_into().unwrap()))
 	}
 
 	pub fn payload(&self) -> Option<&[u8]> {
 		if self.is_neigbour() {
-			// neigbour pack: 1 byte + payload
-			if self.data.len() < 2 {
+			// neigbour pack: flags(1) + cmd(1) + payload
+			if self.data.len() < 3 {
 				return None;
 			}
-			return Some(&self.data[1..]);
+			return Some(&self.data[2..]);
 		}
-		// message pack: 1 byte + 1 byte + 8 bytes + payload 
+		// message pack: flags(1) + msg(1) + round(8) + payload 
 		if self.data.len() < 11 {
 			return None;
 		}
@@ -179,6 +214,6 @@ impl Packet {
 fn check_flag(byte: u8, f: Flags) -> bool {
 	match Flags::from_bits(byte) {
 		None => false,
-		Some(f) => f.contains(f)
+		Some(flags) => flags.contains(f)
 	}
 }

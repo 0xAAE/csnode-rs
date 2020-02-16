@@ -28,7 +28,11 @@ impl PacketCollector {
 					None => (),
 					Some(pack) => {
 						if pack.is_neigbour() {
-							info!("get neigbour packet, payload size: {}", pack.payload().unwrap_or_default().len());
+							let cmd = match pack.nghbr_cmd() {
+								None => "Unknown".to_string(),
+								Some(v) => v.to_string()
+							};
+							info!("cmd::{}: {} bytes", cmd, pack.payload().unwrap_or_default().len());
 						}
 						else if pack.is_message() {
 							let mt = match pack.msg_type() {
@@ -43,7 +47,7 @@ impl PacketCollector {
 								None => "None".to_string(),
 								Some(v) => v.len().to_string()
 							};
-							info!("get message packet {} from round {} with payload of {} bytes", mt, r, plen);
+							info!("msg::{}[{}]: {} bytes", mt, r, plen);
 						}
 						else {
 							warn!("get strange packet, neither neigbour, nor message");
