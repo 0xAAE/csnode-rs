@@ -4,7 +4,7 @@ use std::thread::{JoinHandle, spawn};
 use std::time;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::{channel, sync_channel, Receiver, SyncSender};
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::prelude::*;
@@ -19,17 +19,22 @@ extern crate csp2p_rs;
 use csp2p_rs::{CSHost, NodeInfo, NodeId, RawPacket};
 
 const TEST_STOP_DELAY_SEC: u64 = 2;
-const MAX_PACKET_QUEUE: usize = 1024;
+const MAX_MSG_QUEUE: usize = 1024;
+const MAX_CMD_QUEUE: usize = 1024;
 
-//mod fragment;
 mod packet;
+use packet::Packet;
+
 //mod fragment_receiver;
+
 mod packet_collector;
+mod neighbourhood;
+mod message_processor;
 
 pub struct Network {
 	collect_thread:		JoinHandle<()>,
-	dispatch_thread:	JoinHandle<()>,
-	prepare_thread:		JoinHandle<()>,
+	neighbours_thread: 	JoinHandle<()>,
+	processor_thread:	JoinHandle<()>,
 	send_thread:		JoinHandle<()>,
 	stop_flag: Arc<AtomicBool>
 }
@@ -37,8 +42,12 @@ pub struct Network {
 impl Network {
 	pub fn new(conf: SharedConfig) -> Box<Network> {
 		let stop_flag_instance = Arc::new(AtomicBool::new(false));
-		// todo move queue limitation to <pack_collector -> pack_handler> channel
-		let (tx, rx) = channel::<RawPacket>();
+        // p2p-compat -> packet_collector channel, fully async:
+        let (tx_raw, rx_raw) = channel::<RawPacket>();
+        // packet_collector -> neighbourhood channel, may drop excess commands
+        let (tx_cmd, rx_cmd) = sync_channel::<Packet>(MAX_CMD_QUEUE);
+        // packet_collector -> msg_processor channel, may drop excess messages
+        let (tx_msg, rx_msg) = sync_channel::<Packet>(MAX_MSG_QUEUE);
 
 		// start p2p-compat CSHost
 
@@ -53,7 +62,7 @@ impl Network {
 	
 		// init host with own id
 		let bytes = node_id[..].from_base58().unwrap(); // base58 -> Vec<u8>
-		let mut host = CSHost::new(&bytes[..], tx).unwrap();
+		let mut host = CSHost::new(&bytes[..], tx_raw).unwrap();
 	
 		// init host entry points list
 		let mut known_hosts = Vec::<NodeInfo>::new();
@@ -63,9 +72,9 @@ impl Network {
 		
 		let instance = Box::new(Network {
 			stop_flag: stop_flag_instance.clone(),
-			collect_thread: start_collect(conf.clone(), stop_flag_instance.clone(), rx),
-			dispatch_thread: start_dispatch(conf.clone(), stop_flag_instance.clone()),
-			prepare_thread: start_prepare(conf.clone(), stop_flag_instance.clone()),
+			collect_thread: start_collect(conf.clone(), stop_flag_instance.clone(), rx_raw, tx_cmd, tx_msg),
+			neighbours_thread: start_neighbourhood(conf.clone(), stop_flag_instance.clone(), rx_cmd),
+			processor_thread: start_msg_processor(conf.clone(), stop_flag_instance.clone(), rx_msg),
 			send_thread: start_send(conf.clone(), stop_flag_instance.clone())
 		});
 		instance
@@ -74,17 +83,20 @@ impl Network {
 	pub fn stop(self) {
 		self.stop_flag.store(true, Ordering::SeqCst);
 		self.collect_thread.join().expect("Failed to stop packet collector");
-		self.dispatch_thread.join().expect("Failed to stop packet dispatcher");
-		self.prepare_thread.join().expect("Failed to stop send preparator");
+		self.neighbours_thread.join().expect("Failed to stop neihbourhood");
+		self.processor_thread.join().expect("Failed to stop message processor");
 		self.send_thread.join().expect("Failed to stop fragment sender");
 	}
 }
 
-fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx: Receiver<(NodeId, Vec<u8>)>) -> JoinHandle<()> {
+fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>,
+        rx_raw: Receiver<(NodeId, Vec<u8>)>,
+        tx_cmd: SyncSender<Packet>,
+        tx_msg: SyncSender<Packet>) -> JoinHandle<()> {
 	info!("Start packet collector");
 	let handle = spawn(move || {
 		info!("Packet collector started");
-		let packet_collector = packet_collector::PacketCollector::new(rx);
+		let packet_collector = packet_collector::PacketCollector::new(rx_raw, tx_cmd, tx_msg);
         loop {
 			packet_collector.recv();
             if stop_flag.load(Ordering::SeqCst) {
@@ -96,32 +108,34 @@ fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx: Receiver<(
 	handle
 }
 
-fn start_dispatch(_conf: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
-	info!("Start packet dispatcher");
+fn start_neighbourhood(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: Receiver<Packet>) -> JoinHandle<()> {
+	info!("Start neighbourhood service");
 	let handle = spawn(move || {
-		info!("Packet dispatcher started");
+        info!("Neighbourhood started");
+        let neighbourhood = neighbourhood::Neighbourhood::new(rx_cmd);
         loop {
-            thread::sleep(time::Duration::from_secs(TEST_STOP_DELAY_SEC));
+            neighbourhood.recv();
             if stop_flag.load(Ordering::SeqCst) {
                 break;
             }
         }
-        info!("Packet dispatcher stopped");
+        info!("Neighbourhood stopped");
 	});
 	handle
 }
 
-fn start_prepare(_conf: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
-	info!("Start send preparator");
+fn start_msg_processor(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_msg: Receiver<Packet>) -> JoinHandle<()> {
+	info!("Start message processor");
 	let handle = spawn(move || {
-		info!("Send preparator started");
+        info!("Message processor started");
+        let msg_processor = message_processor::MessageProcessor::new(rx_msg);
         loop {
-            thread::sleep(time::Duration::from_secs(TEST_STOP_DELAY_SEC));
+            msg_processor.recv();
             if stop_flag.load(Ordering::SeqCst) {
                 break;
             }
         }
-        info!("Send preparator stopped");
+        info!("Message processor stopped");
 	});
 	handle
 }

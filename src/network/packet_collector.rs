@@ -2,26 +2,30 @@ use super::TEST_STOP_DELAY_SEC;
 use super::packet::Packet;
 
 use log::{info, warn};
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, SyncSender, TrySendError};
 use std::time::Duration;
 
 extern crate csp2p_rs;
-use csp2p_rs::NodeId;
+use csp2p_rs::RawPacket;
 
 pub struct PacketCollector {
-	rx: Receiver<(NodeId, Vec<u8>)>
+	rx_raw: Receiver<RawPacket>,
+	tx_cmd: SyncSender<Packet>,
+	tx_msg: SyncSender<Packet>
 }
 
 impl PacketCollector {
 
-	pub fn new(receiver: Receiver<(NodeId, Vec<u8>)>) -> PacketCollector {
+	pub fn new(rx_raw: Receiver<RawPacket>, tx_cmd: SyncSender<Packet>, tx_msg: SyncSender<Packet>) -> PacketCollector {
 		PacketCollector {
-			rx: receiver
+			rx_raw: rx_raw,
+			tx_cmd: tx_cmd,
+			tx_msg: tx_msg
 		}
 	}
 
 	pub fn recv(&self) {
-		match self.rx.recv_timeout(Duration::from_secs(TEST_STOP_DELAY_SEC)) {
+		match self.rx_raw.recv_timeout(Duration::from_secs(TEST_STOP_DELAY_SEC)) {
 			Err(_) => (),
 			Ok(data) => {
 				match Packet::new(data.0, data.1) {
@@ -32,9 +36,18 @@ impl PacketCollector {
 								None => "Unknown".to_string(),
 								Some(v) => v.to_string()
 							};
-							info!("cmd::{}: {} bytes", cmd, pack.payload().unwrap_or_default().len());
+							info!("-> cmd::{}: {} bytes", cmd, pack.payload().unwrap_or_default().len());
+							match self.tx_cmd.try_send(pack) {
+								Ok(_) => (),
+								Err(TrySendError::Full(_)) => {
+									info!("command queue is full, drop until someone is handled");
+								},
+								Err(TrySendError::Disconnected(_)) => {
+									warn!("neighbourhood is disconnected")
+								}
+							};
 						}
-						else if pack.is_message() {
+						else { // pack is message
 							let mt = match pack.msg_type() {
 								None => "Unknown".to_string(),
 								Some(v) => v.to_string()
@@ -47,10 +60,16 @@ impl PacketCollector {
 								None => "None".to_string(),
 								Some(v) => v.len().to_string()
 							};
-							info!("msg::{}[{}]: {} bytes", mt, r, plen);
-						}
-						else {
-							warn!("get strange packet, neither neigbour, nor message");
+							info!("-> msg::{}[{}]: {} bytes", mt, r, plen);
+							match self.tx_msg.try_send(pack) {
+								Ok(_) => (),
+								Err(TrySendError::Full(_)) => {
+									info!("message queue is full, drop until someone is handled");
+								},
+								Err(TrySendError::Disconnected(_)) => {
+									warn!("message processor is disconnected")
+								}
+							};
 						}
 					}
 				}
