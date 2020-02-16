@@ -1,7 +1,5 @@
 use super::config::SharedConfig;
-use std::thread;
 use std::thread::{JoinHandle, spawn};
-use std::time;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, sync_channel, Receiver, SyncSender, Sender};
