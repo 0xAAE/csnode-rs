@@ -30,6 +30,7 @@ use packet::Packet;
 mod packet_collector;
 mod command_processor;
 mod message_processor;
+mod packet_sender;
 
 pub struct Network {
 	collect_thread:		JoinHandle<()>,
@@ -77,7 +78,7 @@ impl Network {
 			collect_thread: start_collect(conf.clone(), stop_flag_instance.clone(), rx_raw, tx_cmd, tx_msg),
 			neighbours_thread: start_neighbourhood(conf.clone(), stop_flag_instance.clone(), rx_cmd, tx_send.clone()),
 			processor_thread: start_msg_processor(conf.clone(), stop_flag_instance.clone(), rx_msg, tx_send),
-			sender_thread: start_sender(conf.clone(), stop_flag_instance.clone())
+			sender_thread: start_sender(conf.clone(), stop_flag_instance.clone(), rx_send)
 		});
 		instance
 	}
@@ -142,12 +143,13 @@ fn start_msg_processor(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_msg: 
 	handle
 }
 
-fn start_sender(_conf: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
+fn start_sender(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_send: Receiver<Packet>) -> JoinHandle<()> {
 	info!("Start fragment sender");
 	let handle = spawn(move || {
-		info!("Fragment sender started");
+        info!("Fragment sender started");
+        let packet_sender = packet_sender::PacketSender::new(rx_send);
         loop {
-            thread::sleep(time::Duration::from_secs(TEST_STOP_DELAY_SEC));
+            packet_sender.recv();
             if stop_flag.load(Ordering::SeqCst) {
                 break;
             }
