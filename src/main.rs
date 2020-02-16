@@ -20,6 +20,8 @@ use std::thread::spawn;
 use std::thread::JoinHandle;
 use std::time;
 
+const NODE_VERSION: u16 = 502;
+const UUID_TESTNET: u64 = 5283967947175248524;
 pub const PUBLIC_KEY_SIZE: usize = 32;
 pub const HASH_SIZE: usize = 32;
 
