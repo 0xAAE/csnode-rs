@@ -1,20 +1,22 @@
 use super::config::SharedConfig;
 use std::thread;
-use std::thread::JoinHandle;
-use std::thread::spawn;
+use std::thread::{JoinHandle, spawn};
 use std::time;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::sync_channel;
-use std::sync::mpsc::{SyncSender, Receiver};
+use std::sync::mpsc::{channel, Receiver};
+use std::path::PathBuf;
+use std::fs::File;
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::str::FromStr;
 use log::info;
 
 extern crate base58;
 use base58::FromBase58;
 
 extern crate csp2p_rs;
-use csp2p_rs::CSHost;
-use csp2p_rs::NodeInfo;
+use csp2p_rs::{CSHost, NodeInfo, NodeId, RawPacket};
 
 const TEST_STOP_DELAY_SEC: u64 = 2;
 const MAX_PACKET_QUEUE: usize = 1024;
@@ -23,8 +25,6 @@ const MAX_PACKET_QUEUE: usize = 1024;
 mod packet;
 //mod fragment_receiver;
 mod packet_collector;
-
-use packet::Packet;
 
 pub struct Network {
 	collect_thread:		JoinHandle<()>,
@@ -38,7 +38,7 @@ impl Network {
 	pub fn new(conf: SharedConfig) -> Box<Network> {
 		let stop_flag_instance = Arc::new(AtomicBool::new(false));
 		// todo move queue limitation to <pack_collector -> pack_handler> channel
-		let (tx_packet, rx_packet) = sync_channel::<Vec<u8>>(MAX_PACKET_QUEUE);
+		let (tx, rx) = channel::<RawPacket>();
 
 		// start p2p-compat CSHost
 
@@ -53,7 +53,7 @@ impl Network {
 	
 		// init host with own id
 		let bytes = node_id[..].from_base58().unwrap(); // base58 -> Vec<u8>
-		let mut host = CSHost::new(&bytes[..], tx_packet).unwrap();
+		let mut host = CSHost::new(&bytes[..], tx).unwrap();
 	
 		// init host entry points list
 		let mut known_hosts = Vec::<NodeInfo>::new();
@@ -63,7 +63,7 @@ impl Network {
 		
 		let instance = Box::new(Network {
 			stop_flag: stop_flag_instance.clone(),
-			collect_thread: start_collect(conf.clone(), stop_flag_instance.clone(), rx_packet),
+			collect_thread: start_collect(conf.clone(), stop_flag_instance.clone(), rx),
 			dispatch_thread: start_dispatch(conf.clone(), stop_flag_instance.clone()),
 			prepare_thread: start_prepare(conf.clone(), stop_flag_instance.clone()),
 			send_thread: start_send(conf.clone(), stop_flag_instance.clone())
@@ -80,7 +80,7 @@ impl Network {
 	}
 }
 
-fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx: Receiver<Vec<u8>>>) -> JoinHandle<()> {
+fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx: Receiver<(NodeId, Vec<u8>)>) -> JoinHandle<()> {
 	info!("Start packet collector");
 	let handle = spawn(move || {
 		info!("Packet collector started");

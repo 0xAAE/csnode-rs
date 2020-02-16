@@ -1,4 +1,4 @@
-use super::super::{PublicKey, PUBLIC_KEY_SIZE, ZERO_PUBLIC_KEY};
+use super::super::{PublicKey, PUBLIC_KEY_SIZE};
 //use super::super::bitflags;
 //use super::super::blake2s_simd::Hash;
 use std::convert::{TryInto, TryFrom};
@@ -43,7 +43,7 @@ fn test_bitflags() {
 // copy of c++ enum
 #[repr(u8)]
 #[derive(Debug, TryFromPrimitive)]
-enum MsgType {
+pub enum MsgType {
     BootstrapTable,
     Transactions,
     FirstTransaction,
