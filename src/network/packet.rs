@@ -209,6 +209,15 @@ impl Packet {
 		}
 		Some(&self.data[10..])
 	}
+
+	pub fn sender(&self) -> Option<&PublicKey> {
+		if self.sender.is_some() {
+			Some(self.sender.as_ref().unwrap())
+		}
+		else {
+			None
+		}
+	}
 }
 
 fn check_flag(byte: u8, f: Flags) -> bool {

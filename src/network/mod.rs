@@ -22,13 +22,13 @@ const TEST_STOP_DELAY_SEC: u64 = 2;
 const MAX_MSG_QUEUE: usize = 1024;
 const MAX_CMD_QUEUE: usize = 1024;
 
-mod packet;
+pub mod packet;
 use packet::Packet;
 
 //mod fragment_receiver;
 
 mod packet_collector;
-mod neighbourhood;
+mod command_processor;
 mod message_processor;
 
 pub struct Network {
@@ -108,11 +108,11 @@ fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>,
 	handle
 }
 
-fn start_neighbourhood(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: Receiver<Packet>) -> JoinHandle<()> {
+fn start_neighbourhood(conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: Receiver<Packet>) -> JoinHandle<()> {
 	info!("Start neighbourhood service");
 	let handle = spawn(move || {
         info!("Neighbourhood started");
-        let neighbourhood = neighbourhood::Neighbourhood::new(rx_cmd);
+        let neighbourhood = command_processor::CommandProcessor::new(conf.clone(), rx_cmd);
         loop {
             neighbourhood.recv();
             if stop_flag.load(Ordering::SeqCst) {

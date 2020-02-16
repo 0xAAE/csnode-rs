@@ -1,0 +1,51 @@
+use std::sync::mpsc::Receiver;
+use std::time::Duration;
+
+use log::{info, warn};
+
+// network submodules
+use super::TEST_STOP_DELAY_SEC;
+use super::packet::Packet;
+// top-level modules
+use super::super::config::SharedConfig;
+use super::super::collaboration::Collaboration;
+
+pub struct CommandProcessor {
+    rx_cmd: Receiver<Packet>,
+    collaboration: Collaboration
+}
+
+impl CommandProcessor {
+
+    pub fn new(conf: SharedConfig, rx_cmd: Receiver<Packet>) -> CommandProcessor {
+        CommandProcessor {
+            rx_cmd: rx_cmd,
+            collaboration: Collaboration::new(conf)
+        }
+    }
+
+    pub fn recv(&self) {
+		match self.rx_cmd.recv_timeout(Duration::from_secs(TEST_STOP_DELAY_SEC)) {
+			Err(_) => (),
+			Ok(p) => {
+                match p.nghbr_cmd() {
+                    None => {
+                        warn!("<- Unknown command, drop");
+                    },
+                    Some(v) => {
+                        match p.sender() {
+                            None => {
+                                warn!("<- cmd::{} has no sender, drop", v.to_string());
+                            }
+                            Some(s) => {
+                                info!("<- cmd::{}", v.to_string());
+                                self.collaboration.handle(s, v, p.payload());
+                            }
+                        }
+                    }
+                };
+            }
+        }
+    }
+
+}

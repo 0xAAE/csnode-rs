@@ -11,6 +11,7 @@ use config::SharedConfig;
 
 mod logger;
 mod network;
+mod collaboration;
 
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -57,7 +58,7 @@ fn main() {
     thread::sleep(time::Duration::from_secs(300));
     stop_flag.store(true, Ordering::SeqCst);
     config_observer.join().unwrap();
-    network.join();
+    network.join().unwrap();
 }
 
 fn start_config_observer_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
