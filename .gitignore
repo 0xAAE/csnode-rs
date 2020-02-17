@@ -4,3 +4,4 @@
 /build
 /third-party/p2p_compat/build
 debug.log
+config.ini
