@@ -11,6 +11,7 @@ use config::SharedConfig;
 
 mod logger;
 mod network;
+use network::TEST_STOP_DELAY_SEC;
 mod collaboration;
 
 use std::sync::{Arc, RwLock};
@@ -61,6 +62,7 @@ fn main() {
     stop_flag.store(true, Ordering::SeqCst);
     config_observer.join().unwrap();
     network.join().unwrap();
+    info!("Node exit");
 }
 
 fn start_config_observer_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
@@ -100,7 +102,7 @@ fn start_network_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> Joi
         let net = network::Network::new(config);
         info!("Network started");
         loop {
-            thread::sleep(time::Duration::from_secs(2));
+            thread::sleep(time::Duration::from_secs(TEST_STOP_DELAY_SEC));
             if stop_flag.load(Ordering::SeqCst) {
                 break;
             }

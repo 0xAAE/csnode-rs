@@ -16,7 +16,7 @@ use base58::FromBase58;
 extern crate csp2p_rs;
 use csp2p_rs::{CSHost, NodeInfo, NodeId, RawPacket};
 
-const TEST_STOP_DELAY_SEC: u64 = 2;
+pub const TEST_STOP_DELAY_SEC: u64 = 2;
 const MAX_MSG_QUEUE: usize = 1024;
 const MAX_CMD_QUEUE: usize = 1024;
 
@@ -142,9 +142,9 @@ fn start_msg_processor(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_msg: 
 }
 
 fn start_sender(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_send: Receiver<Packet>) -> JoinHandle<()> {
-	info!("Start fragment sender");
+	info!("Start packet sender");
 	let handle = spawn(move || {
-        info!("Fragment sender started");
+        info!("Packet sender started");
         let packet_sender = packet_sender::PacketSender::new(rx_send);
         loop {
             packet_sender.recv();
@@ -152,7 +152,7 @@ fn start_sender(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_send: Receiv
                 break;
             }
         }
-        info!("Fragment sender stopped");
+        info!("Packet sender stopped");
 	});
 	handle
 }
