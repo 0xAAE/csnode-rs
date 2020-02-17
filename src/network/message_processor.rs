@@ -1,7 +1,7 @@
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
-use log::info;
+use log::debug;
 
 // network submodules
 use super::TEST_STOP_DELAY_SEC;
@@ -32,7 +32,7 @@ impl MessageProcessor {
                     None => "Unknown".to_string(),
                     Some(v) => v.to_string()
                 };
-                info!("<- msg::{}", mt)
+                debug!("msg::{}", mt)
             }
         }
     }

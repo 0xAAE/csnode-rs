@@ -218,6 +218,10 @@ impl Packet {
 			None
 		}
 	}
+
+	pub fn data(&self) -> &[u8] {
+		&self.data
+	}
 }
 
 fn check_flag(byte: u8, f: Flags) -> bool {

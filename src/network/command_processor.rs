@@ -1,7 +1,7 @@
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
-use log::{info, warn};
+use log::{debug, warn};
 
 // network submodules
 use super::TEST_STOP_DELAY_SEC;
@@ -30,15 +30,15 @@ impl CommandProcessor {
 			Ok(p) => {
                 match p.nghbr_cmd() {
                     None => {
-                        warn!("<- Unknown command, drop");
+                        warn!("unknown command, drop");
                     },
                     Some(v) => {
                         match p.sender() {
                             None => {
-                                warn!("<- cmd::{} has no sender, drop", v.to_string());
+                                warn!("cmd::{} has no sender, drop", v.to_string());
                             }
                             Some(s) => {
-                                info!("<- cmd::{}", v.to_string());
+                                debug!("cmd::{}", v.to_string());
                                 self.collaboration.handle(s, v, p.payload());
                             }
                         }

@@ -1,7 +1,7 @@
 use super::TEST_STOP_DELAY_SEC;
 use super::packet::Packet;
 
-use log::{info, warn};
+use log::{debug, info, warn};
 use std::sync::mpsc::{Receiver, SyncSender, TrySendError};
 use std::time::Duration;
 
@@ -36,7 +36,7 @@ impl PacketCollector {
 								None => "Unknown".to_string(),
 								Some(v) => v.to_string()
 							};
-							info!("-> cmd::{}: {} bytes", cmd, pack.payload().unwrap_or_default().len());
+							debug!("<- cmd::{}: {} bytes", cmd, pack.payload().unwrap_or_default().len());
 							match self.tx_cmd.try_send(pack) {
 								Ok(_) => (),
 								Err(TrySendError::Full(_)) => {
@@ -60,7 +60,7 @@ impl PacketCollector {
 								None => "None".to_string(),
 								Some(v) => v.len().to_string()
 							};
-							info!("-> msg::{}[{}]: {} bytes", mt, r, plen);
+							debug!("<- msg::{}[{}]: {} bytes", mt, r, plen);
 							match self.tx_msg.try_send(pack) {
 								Ok(_) => (),
 								Err(TrySendError::Full(_)) => {

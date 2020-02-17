@@ -1,7 +1,7 @@
 use std::sync::mpsc::Sender;
 use std::io::Write;
 
-use log::{info, warn};
+use log::{debug, warn, error};
 
 use super::config::SharedConfig;
 use super::PublicKey;
@@ -44,20 +44,20 @@ impl Collaboration {
         let mut output: Vec<u8> = Vec::<u8>::new();
         match pack_version_reply(&mut output) {
             Err(_) => {
-                warn!("Failed to serialize version reply");
+                error!("failed to serialize version reply");
             },
             Ok(_) => {
                 match Packet::new(*sender, output) {
                     None => {
-                        warn!("Failed create version reply packet");
+                        error!("failed create version reply packet");
                     },
                     Some(pack) => {
                         match self.tx_send.send(pack) {
                             Err(e) => {
-                                warn!("Failed send version reply packet: {}", e);
+                                warn!("failed send version reply packet: {}", e);
                             },
                             Ok(_) => {
-                                info!("-> version reply packet");
+                                debug!("create version reply packet");
                             }
                         }
                     }
