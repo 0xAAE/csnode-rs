@@ -101,7 +101,10 @@ pub enum NghbrCmd {
     VersionRequest,
     VersionReply,
     Ping,
-    Pong
+	Pong,
+	// inner, not in original
+	NodeFound = 253,
+	NodeLost = 254
 }
 
 impl fmt::Display for NghbrCmd {
