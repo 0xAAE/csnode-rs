@@ -1,6 +1,7 @@
 use std::sync::mpsc::Sender;
 use std::io::Write;
 use std::collections::HashMap;
+use std::sync::RwLock;
 
 use log::{debug, info, warn, error};
 
@@ -34,7 +35,7 @@ pub struct Collaboration {
     tx_send: Sender<Packet>,
     sequence: u64,
     round: u64,
-    neighbours: HashMap<PublicKey, PeerInfo>,
+    neighbours: RwLock<HashMap<PublicKey, PeerInfo>>,
     config: SharedConfig
 }
 
@@ -45,7 +46,7 @@ impl Collaboration {
             tx_send: tx_send,
             sequence: 0,
             round: 0,
-            neighbours: HashMap::<PublicKey, PeerInfo>::new(),
+            neighbours: RwLock::new(HashMap::<PublicKey, PeerInfo>::new()),
             config: conf
         }
     }
@@ -114,13 +115,14 @@ impl Collaboration {
             Err(e) => {
                 warn!("failed to unpack remote peer info: {}", e);
                 return;
-            }
+            },
             Ok(peer_info) => {
                 if !self.try_add_peer(sender, peer_info) {
                     debug!("new peer info rejected");
                 }
                 else {
-                    info!("add new neighbour, now total {}", self.neighbours.len());
+                    let guard = self.neighbours.read().unwrap();
+                    info!("add new neighbour, now total {}", guard.len());
                 }
             }
         };
@@ -153,8 +155,31 @@ impl Collaboration {
         }
     }
 
-    fn handle_pong(&self, _sender: &PublicKey, _bytes: Option<&[u8]>) {
-        
+    fn handle_pong(&mut self, sender: &PublicKey, bytes: Option<&[u8]>) {
+        if bytes.is_none() {
+            warn!("malformed pong packet, no payload attached");
+            return;
+        }
+        let req_len = 8 + 8; // sequence + round
+        let input = bytes.unwrap();
+        if input.len() < req_len {
+            warn!("inconsistent pong payload, required {} bytes, actual {}", req_len, input.len());
+            return;
+        }
+        match unpack_peer_update(input) {
+            Err(e) => {
+                warn!("faile to unpack remote peer update: {}", e);
+                return;
+            }
+            Ok(data) => {
+                if !self.try_update_peer(sender, data) {
+                    debug!("peer is not updated");
+                }
+                else {
+                    info!("neighbour info updated");
+                }
+            }
+        }
     }
 
     fn handle_node_found(&self, node_id: &PublicKey) {
@@ -184,13 +209,51 @@ impl Collaboration {
         }
     }
 
-    fn handle_node_lost(&self, _node_id: &PublicKey) {
+    fn handle_node_lost(&mut self, node_id: &PublicKey) {
+        {
+            let guard = self.neighbours.read().unwrap();
+            if !guard.contains_key(node_id) {
+                return;
+            }
+        }
+        let mut guard = self.neighbours.write().unwrap();
+        let _ = guard.remove_entry(node_id);
+    }
+
+    fn try_update_peer(&mut self, key: &PublicKey, data: (u64, u64)) -> bool {
+        {
+            let guard = self.neighbours.read().unwrap();
+            if ! guard.contains_key(key) {
+                return false;
+            }
+        }
+
+        let mut guard = self.neighbours.write().unwrap();
+        let info = guard.get_mut(key).unwrap();
+        let mut updated = false;
+        if info.sequence < data.0 {
+            info.sequence = data.0;
+            updated = true;
+        }
+        if info.round < data.1 {
+            info.round = data.1;
+            updated = true;
+        }
+        updated
     }
 
     fn try_add_peer(&mut self, key: &PublicKey, peer_info: PeerInfo) -> bool {
 
-        if self.neighbours.contains_key(key) {
+        let exists: bool;
+        let count: usize;
+        {
+            let guard = self.neighbours.read().unwrap();
+            exists = guard.contains_key(key);
+            count = guard.len();
+        }
 
+        if exists {
+            // read config
             let max_neighbours;
             let mut min_version = NODE_VERSION;
             {
@@ -214,13 +277,14 @@ impl Collaboration {
 
             // test selfability
     
-            if self.neighbours.len() >= max_neighbours {
+            if count >= max_neighbours {
                 debug!("max allowed neighbors {} has reached, reject", max_neighbours);
                 return false;
             }
         }
 
-        match self.neighbours.insert(*key, peer_info) {
+        let mut guard = self.neighbours.write().unwrap();
+        match guard.insert(*key, peer_info) {
             None => (),
             Some(_old_info) => {
                 info!("already known peer {} has found again", key[..].to_base58());
@@ -298,4 +362,17 @@ fn unpack_peer_info(input: &[u8]) -> bincode::Result<PeerInfo> {
     peer_info.round = deserialize_from(input)?;
 
     Ok(peer_info)
+}
+
+fn unpack_peer_update(input: &[u8]) -> bincode::Result<(u64, u64)> {
+    /*
+        PeerInfo& info = neighbour->second;
+        cs::IDataStream stream(pack.getMsgData(), pack.getMsgSize());
+        stream >> info.lastSeq;
+        stream >> info.roundNumber;
+    */
+    let seq: u64 = deserialize_from(input)?;
+    let round: u64 = deserialize_from(input)?;
+    
+    Ok((seq, round))
 }
