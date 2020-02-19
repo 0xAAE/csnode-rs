@@ -113,7 +113,7 @@ fn start_neighbourhood(conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: R
 	info!("Start neighbourhood service");
 	let handle = spawn(move || {
         info!("Neighbourhood started");
-        let neighbourhood = command_processor::CommandProcessor::new(conf.clone(), rx_cmd, tx_send);
+        let mut neighbourhood = command_processor::CommandProcessor::new(conf.clone(), rx_cmd, tx_send);
         loop {
             neighbourhood.recv();
             if stop_flag.load(Ordering::SeqCst) {

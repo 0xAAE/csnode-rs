@@ -21,10 +21,10 @@ pub struct Config {
 	pub hosts_filename: String,
 	bootstrap_type: String,
 	ipv6: bool,
-	min_compatible_version: u32,
+	pub min_compatible_version: u32,
 	backward_compatible: bool,
 	min_neighbours: usize,
-	max_neighbours: usize,
+	pub max_neighbours: usize,
 	//connection_bandwidth: usize, // obsolete
 	pub reload_delay_sec: u32, // observer_wait_time
 	restrict_neighbours: bool,

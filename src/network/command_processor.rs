@@ -24,7 +24,7 @@ impl CommandProcessor {
         }
     }
 
-    pub fn recv(&self) {
+    pub fn recv(&mut self) {
 		match self.rx_cmd.recv_timeout(Duration::from_secs(TEST_STOP_DELAY_SEC)) {
 			Err(_) => (),
 			Ok(p) => {

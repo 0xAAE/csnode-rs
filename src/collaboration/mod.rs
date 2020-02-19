@@ -1,7 +1,8 @@
 use std::sync::mpsc::Sender;
 use std::io::Write;
+use std::collections::HashMap;
 
-use log::{debug, warn, error};
+use log::{debug, info, warn, error};
 
 use super::config::SharedConfig;
 use super::PublicKey;
@@ -9,27 +10,47 @@ use super::{NODE_VERSION, UUID_TESTNET};
 use super::network::packet::{Flags, Packet};
 
 extern crate bincode;
-use bincode::serialize_into;
+use bincode::{serialize_into, deserialize_from};
+extern crate base58;
+use base58::ToBase58; // [u8].to_base58()
 
 type Command = super::network::packet::NghbrCmd;
+
+#[derive(Default)]
+struct PeerInfo {
+    /// build numbder
+    version: u16,
+    /// blockchain UUID
+    uuid: u64,
+    /// tlast reported max stored block sequence
+    sequence: u64,
+    /// the last repported consensus round
+    round: u64,
+    /// requires to be persistent
+    persistent: bool
+}
 
 pub struct Collaboration {
     tx_send: Sender<Packet>,
     sequence: u64,
-    round: u64
+    round: u64,
+    neighbours: HashMap<PublicKey, PeerInfo>,
+    config: SharedConfig
 }
 
 impl Collaboration {
 
-    pub fn new(_conf: SharedConfig, tx_send: Sender<Packet>) -> Collaboration {
+    pub fn new(conf: SharedConfig, tx_send: Sender<Packet>) -> Collaboration {
         Collaboration {
             tx_send: tx_send,
             sequence: 0,
-            round: 0
+            round: 0,
+            neighbours: HashMap::<PublicKey, PeerInfo>::new(),
+            config: conf
         }
     }
 
-    pub fn handle(&self, sender: &PublicKey, cmd: Command, bytes: Option<&[u8]>) {
+    pub fn handle(&mut self, sender: &PublicKey, cmd: Command, bytes: Option<&[u8]>) {
         match cmd {
             Command::Error => self.handle_error(sender, bytes),
             Command::VersionRequest => self.handle_version_request(sender, bytes),
@@ -72,8 +93,37 @@ impl Collaboration {
         }
     }
 
-    fn handle_version_reply(&self, _sender: &PublicKey, _bytes: Option<&[u8]>) {
-        
+    fn handle_version_reply(&mut self, sender: &PublicKey, bytes: Option<&[u8]>) {
+        // try to unpack peer info
+        if bytes.is_none() {
+            warn!("malformed version reply: no payload");
+            return;
+        }
+        let req_len = 2 + 8 + 8 + 8; // ver + uuid + seq + round
+        let input = bytes.unwrap();
+        if input.len() < req_len {
+            warn!("inconsistent version reply payload, required {} bytes, actual {}", req_len, input.len());
+            return;
+        }
+        /*
+            PeerInfo info;
+            ...
+            tryToAddNew(sender, info);
+        */
+        match unpack_peer_info(input) {
+            Err(e) => {
+                warn!("failed to unpack remote peer info: {}", e);
+                return;
+            }
+            Ok(peer_info) => {
+                if !self.try_add_peer(sender, peer_info) {
+                    debug!("new peer info rejected");
+                }
+                else {
+                    info!("add new neighbour, now total {}", self.neighbours.len());
+                }
+            }
+        };
     }
 
     fn handle_ping(&self, sender: &PublicKey, _bytes: Option<&[u8]>) {
@@ -125,7 +175,7 @@ impl Collaboration {
                                 warn!("failed send version request packet: {}", e);
                             },
                             Ok(_) => {
-                                debug!("create version request packet");
+                                debug!("transfer version request packet");
                             }
                         }
                     }
@@ -135,6 +185,52 @@ impl Collaboration {
     }
 
     fn handle_node_lost(&self, _node_id: &PublicKey) {
+    }
+
+    fn try_add_peer(&mut self, key: &PublicKey, peer_info: PeerInfo) -> bool {
+
+        if self.neighbours.contains_key(key) {
+
+            let max_neighbours;
+            let mut min_version = NODE_VERSION;
+            {
+                let conf_guard = self.config.read().unwrap();
+                max_neighbours = conf_guard.max_neighbours;
+                let tmp = conf_guard.min_compatible_version;
+                if tmp > 0 {
+                    min_version = tmp as u16;
+                }
+            }
+
+            // test compatibility
+            if peer_info.version < min_version {
+                debug!("peer version is incompatible: {} < {}, reject", peer_info.version, NODE_VERSION);
+                return false;
+            }
+            if peer_info.uuid != UUID_TESTNET {
+                debug!("peer blockchain is incompatible, reject");
+                return false;
+            }
+
+            // test selfability
+    
+            if self.neighbours.len() >= max_neighbours {
+                debug!("max allowed neighbors {} has reached, reject", max_neighbours);
+                return false;
+            }
+        }
+
+        match self.neighbours.insert(*key, peer_info) {
+            None => (),
+            Some(_old_info) => {
+                info!("already known peer {} has found again", key[..].to_base58());
+                // if peer_info.round != old_info.round || peer_info.sequence != old_info.sequence {
+                //     debug!("peer updated")
+                // }
+            }
+        };
+
+        true
     }
 }
 
@@ -182,4 +278,24 @@ fn pack_pong(output: &mut Vec<u8>, sequence: u64, round: u64) -> bincode::Result
     serialize_into(output.by_ref(), &round)?;
 
     Ok(())    
+}
+
+fn unpack_peer_info(input: &[u8]) -> bincode::Result<PeerInfo> {
+    /*
+        PeerInfo info;
+        cs::IDataStream stream(pack.getMsgData(), pack.getMsgSize());
+        stream >> info.nodeVersion;
+        stream >> info.uuid;
+        stream >> info.lastSeq;
+        stream >> info.roundNumber;
+        info.permanent = isPermanent(sender);
+    */
+    let mut peer_info: PeerInfo = Default::default();
+
+    peer_info.version = deserialize_from(input)?;
+    peer_info.uuid = deserialize_from(input)?;
+    peer_info.sequence = deserialize_from(input)?;
+    peer_info.round = deserialize_from(input)?;
+
+    Ok(peer_info)
 }
