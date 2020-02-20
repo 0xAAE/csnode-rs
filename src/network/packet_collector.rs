@@ -1,60 +1,84 @@
 use super::TEST_STOP_DELAY_SEC;
-use super::fragment::Fragment;
 use super::packet::Packet;
-use super::super::PublicKey;
 
-use log::info;
-use std::sync::mpsc::Receiver;
+use log::{debug, info, warn};
+use std::sync::mpsc::{Receiver, SyncSender, TrySendError};
 use std::time::Duration;
-use std::collections::{BTreeSet, HashMap};
 
-#[derive(std::hash::Hash, std::cmp::Eq)]
-struct PacketUnique {
-	id: u64,
-	sender: PublicKey
-}
+extern crate csp2p_rs;
+use csp2p_rs::RawPacket;
 
-impl PartialEq for PacketUnique {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id && self.sender == other.sender
-    }
-}
-
-/// store uncompleted packets fragments: for every different packet accumulates all unique fragments;
-/// when all fragments of some packet has got move it to completed
-type PartialFragmentsCollection = HashMap<PacketUnique, BTreeSet<Fragment>>;
+use super::validator::Validator;
 
 pub struct PacketCollector {
-	rx: Receiver<Fragment>,
-	partial: PartialFragmentsCollection,
-	completed: Vec<Packet>
+	rx_raw: Receiver<RawPacket>,
+	tx_cmd: SyncSender<Packet>,
+	tx_msg: SyncSender<Packet>,
+	validator: Validator
 }
 
 impl PacketCollector {
 
-	pub fn new(rx: Receiver<Fragment>) -> PacketCollector {
-		let partial = PartialFragmentsCollection::new();
-		let completed = Vec::<Packet>::new();
+	pub fn new(rx_raw: Receiver<RawPacket>, tx_cmd: SyncSender<Packet>, tx_msg: SyncSender<Packet>) -> PacketCollector {
 		PacketCollector {
-			rx: rx,
-			partial: partial,
-			completed: completed
+			rx_raw: rx_raw,
+			tx_cmd: tx_cmd,
+			tx_msg: tx_msg,
+			validator: Validator::new()
 		}
 	}
 
 	pub fn recv(&self) {
-		match self.rx.recv_timeout(Duration::from_secs(TEST_STOP_DELAY_SEC)) {
+		match self.rx_raw.recv_timeout(Duration::from_secs(TEST_STOP_DELAY_SEC)) {
 			Err(_) => (),
 			Ok(data) => {
-				match data.payload() {
-					None => {
-						info!("get fragment with no payload");
-					}
-					Some(p) => {
-						let frg: String = data.fragmentation().map_or("single".to_string(), |v| {
-							format!("{} from {}", v.0, v.1)
-						});
-						info!("get fragment with payload of {} bytes, flags {:?}, {}", p.len(), data.flags(), frg);
+				match Packet::new(data.0, data.1) {
+					None => (),
+					Some(pack) => {
+						if !self.validator.validate(&pack) {
+							warn!("packet rejected by validator, drop");
+							return;
+						}
+						if pack.is_neigbour() {
+							let cmd = match pack.nghbr_cmd() {
+								None => "Unknown".to_string(),
+								Some(v) => v.to_string()
+							};
+							debug!("<- cmd::{}: {} bytes", cmd, pack.payload().unwrap_or_default().len());
+							match self.tx_cmd.try_send(pack) {
+								Ok(_) => (),
+								Err(TrySendError::Full(_)) => {
+									info!("command queue is full, drop until someone is handled");
+								},
+								Err(TrySendError::Disconnected(_)) => {
+									warn!("neighbourhood is disconnected")
+								}
+							};
+						}
+						else { // pack is message
+							let mt = match pack.msg_type() {
+								None => "Unknown".to_string(),
+								Some(v) => v.to_string()
+							};
+							let r = match pack.round() {
+								None => "Unset".to_string(),
+								Some(v) => v.to_string()
+							};
+							let plen = match pack.payload() {
+								None => "None".to_string(),
+								Some(v) => v.len().to_string()
+							};
+							debug!("<- msg::{}[{}]: {} bytes", mt, r, plen);
+							match self.tx_msg.try_send(pack) {
+								Ok(_) => (),
+								Err(TrySendError::Full(_)) => {
+									info!("message queue is full, drop until someone is handled");
+								},
+								Err(TrySendError::Disconnected(_)) => {
+									warn!("message processor is disconnected")
+								}
+							};
+						}
 					}
 				}
 			}

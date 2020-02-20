@@ -6,18 +6,14 @@ use log::info;
 
 extern crate blake2s_simd;
 
-extern crate csp2p_rs;
-use csp2p_rs::CSHost;
-use csp2p_rs::NodeInfo;
-
-extern crate bitcoin;
-use bitcoin::util::base58;
-
 mod config;
 use config::SharedConfig;
 
 mod logger;
 mod network;
+use network::TEST_STOP_DELAY_SEC;
+mod collaboration;
+mod core_logic;
 
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -26,16 +22,16 @@ use std::thread::spawn;
 use std::thread::JoinHandle;
 use std::time;
 
+const NODE_VERSION: u16 = 502;
+const UUID_TESTNET: u64 = 5283967947175248524;
 pub const PUBLIC_KEY_SIZE: usize = 32;
 pub const HASH_SIZE: usize = 32;
 
 pub type PublicKey = [u8; PUBLIC_KEY_SIZE];
 //pub type Hash = [u8; HASH_SIZE]; // hash is defined in blake2s
-
-static ZERO_PUBLIC_KEY: PublicKey = [0u8; PUBLIC_KEY_SIZE];
+//static ZERO_PUBLIC_KEY: PublicKey = [0u8; PUBLIC_KEY_SIZE];
 
 fn main() {
-    println!("Hello, world!");
     let mut file_name = "config.ini".to_string();
     for arg in std::env::args().skip(1) {
         if arg.starts_with("--config=") {
@@ -55,32 +51,19 @@ fn main() {
     
     // init logger
     logger::init(conf.clone());
+
     // run config observer thread:
     let config_observer = start_config_observer_thread(conf.clone(), stop_flag.clone());
     
     // run network (which in its turn will start all necessary own threads)
-    let node_key_str = "AAExXjedndkJZrtPpJSX3taw5JB4sjqx32xWWWDnsKUu".to_string();
-    // hex 881730FA0B30985BBDD5F0C0C3A30D9187EFF8CF52C1F94345F39E37E0A9BABA
-    // base58 AAExXjedndkJZrtPpJSX3taw5JB4sjqx32xWWWDnsKUu
-    let mut bytes = base58::from(&node_key_str[..]).unwrap(); // base58 -> Vec<u8>
-    let mut host = csp2p_rs::CSHost::new(&bytes[..]).unwrap();
-    let mut known_hosts = Vec::<NodeInfo>::new();
-    known_hosts.push(
-        NodeInfo {
-            id: base58::from("HBxj19cnpayn46GSqBGyKQXMaLThH4quuPt5gf8aFndg").unwrap(),
-            ip: "195.133.147.58".to_string(),
-            port: 9000
-        }
-    );
-    host.add_known_hosts(known_hosts);
-    host.start();
+    let network = start_network_thread(conf.clone(), stop_flag.clone());
 
     // imitate other work: sleep too long and exit
     thread::sleep(time::Duration::from_secs(300));
     stop_flag.store(true, Ordering::SeqCst);
     config_observer.join().unwrap();
-    
-    host.stop();
+    network.join().unwrap();
+    info!("Node exit");
 }
 
 fn start_config_observer_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
@@ -120,7 +103,7 @@ fn start_network_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> Joi
         let net = network::Network::new(config);
         info!("Network started");
         loop {
-            thread::sleep(time::Duration::from_secs(2));
+            thread::sleep(time::Duration::from_secs(TEST_STOP_DELAY_SEC));
             if stop_flag.load(Ordering::SeqCst) {
                 break;
             }

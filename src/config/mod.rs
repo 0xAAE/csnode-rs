@@ -17,14 +17,14 @@ mod logger;
 
 pub struct Config {
 	// [params]
-	// node_type: String, // obsolete
-	hosts_filename: String,
+	pub node_id: String,
+	pub hosts_filename: String,
 	bootstrap_type: String,
 	ipv6: bool,
-	min_compatible_version: u32,
+	pub min_compatible_version: u32,
 	backward_compatible: bool,
 	min_neighbours: usize,
-	max_neighbours: usize,
+	pub max_neighbours: usize,
 	//connection_bandwidth: usize, // obsolete
 	pub reload_delay_sec: u32, // observer_wait_time
 	restrict_neighbours: bool,
@@ -53,7 +53,7 @@ impl Config {
 
 	pub fn new(file_name: &str) -> Config {
 		let mut instance = Config {
-			//node_type: String::from("client"),
+			node_id: String::from("AAExXjedndkJZrtPpJSX3taw5JB4sjqx32xWWWDnsKUu"),
 			hosts_filename: String::new(),
 			bootstrap_type: String::from("start_node"),
 			ipv6: false,
@@ -133,8 +133,8 @@ impl Config {
 		let mut updated = false;
 		for (k, v) in prop.iter() {
 			match k.as_str() {
-				"node_type" => {
-					trace!("node_type is obsolete and ignored");
+				"node_id" => {
+					updated = try_update(&mut self.node_id, k, v) || updated;
 				}
 				"hosts_filename" => {
 					updated = try_update(&mut self.hosts_filename, k, v) || updated;
