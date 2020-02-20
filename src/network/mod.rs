@@ -29,6 +29,7 @@ mod packet_collector;
 mod command_processor;
 mod message_processor;
 mod packet_sender;
+mod validator;
 
 pub struct Network {
 	collect_thread:		JoinHandle<()>,

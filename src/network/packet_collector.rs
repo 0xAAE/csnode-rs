@@ -8,10 +8,13 @@ use std::time::Duration;
 extern crate csp2p_rs;
 use csp2p_rs::RawPacket;
 
+use super::validator::Validator;
+
 pub struct PacketCollector {
 	rx_raw: Receiver<RawPacket>,
 	tx_cmd: SyncSender<Packet>,
-	tx_msg: SyncSender<Packet>
+	tx_msg: SyncSender<Packet>,
+	validator: Validator
 }
 
 impl PacketCollector {
@@ -20,7 +23,8 @@ impl PacketCollector {
 		PacketCollector {
 			rx_raw: rx_raw,
 			tx_cmd: tx_cmd,
-			tx_msg: tx_msg
+			tx_msg: tx_msg,
+			validator: Validator::new()
 		}
 	}
 
@@ -31,6 +35,10 @@ impl PacketCollector {
 				match Packet::new(data.0, data.1) {
 					None => (),
 					Some(pack) => {
+						if !self.validator.validate(&pack) {
+							warn!("packet rejected by validator, drop");
+							return;
+						}
 						if pack.is_neigbour() {
 							let cmd = match pack.nghbr_cmd() {
 								None => "Unknown".to_string(),
