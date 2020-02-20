@@ -12,8 +12,13 @@ impl Validator {
         }
     }
 
-    pub fn validate(&self, _packet: &Packet) -> bool {
-        // todo implement packet validation
+    pub fn validate(&self, packet: &Packet) -> bool {
+        if !packet.is_neigbour() {
+            if packet.round().is_none() {
+                // malformed message: does not contain round
+                return false;
+            }
+        }
         true
     }
 }

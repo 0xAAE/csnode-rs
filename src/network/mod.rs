@@ -130,7 +130,7 @@ fn start_msg_processor(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_msg: 
 	info!("Start message processor");
 	let handle = spawn(move || {
         info!("Message processor started");
-        let msg_processor = message_processor::MessageProcessor::new(_conf.clone(), rx_msg, tx_send);
+        let mut msg_processor = message_processor::MessageProcessor::new(_conf.clone(), rx_msg, tx_send);
         loop {
             msg_processor.recv();
             if stop_flag.load(Ordering::SeqCst) {

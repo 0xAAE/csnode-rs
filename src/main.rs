@@ -13,6 +13,7 @@ mod logger;
 mod network;
 use network::TEST_STOP_DELAY_SEC;
 mod collaboration;
+mod core_logic;
 
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
