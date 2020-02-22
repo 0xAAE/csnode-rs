@@ -14,6 +14,8 @@ mod network;
 use network::TEST_STOP_DELAY_SEC;
 mod collaboration;
 mod core_logic;
+mod blockchain;
+use blockchain::{SharedBlocks, SharedCaches};
 
 use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -52,6 +54,11 @@ fn main() {
     // init logger
     logger::init(conf.clone());
 
+    // init blockchain
+    let blocks: SharedBlocks = Arc::new(RwLock::new(blockchain::blocks::Blocks::new()));
+
+    // init current state
+    let caches: SharedCaches = Arc::new(RwLock::new(blockchain::caches::Caches::new()));
     // run config observer thread:
     let config_observer = start_config_observer_thread(conf.clone(), stop_flag.clone());
     
