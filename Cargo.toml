@@ -17,6 +17,7 @@ hex = "0.4"
 base58 = "0.1"
 num_enum = "0.4.2"
 bincode = "1.2.1"
+num-format = "0.4.0"
 # num = "0.2.1"
 # hashbrown = "0.6.3" # port of Google's high-performance SwissTable hash map
 # multimap = "0.8.0" # Implemented as a thin wrapper around std::collections::HashMap
