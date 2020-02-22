@@ -255,8 +255,20 @@ impl Collaboration {
                 return;
             }
         }
-        let mut guard = self.neighbours.write().unwrap();
-        let _ = guard.remove_entry(node_id);
+        let lost_peer;
+        {
+            let mut guard = self.neighbours.write().unwrap();
+            lost_peer = guard.remove_entry(node_id);
+        }
+        match lost_peer {
+            None => (),
+            Some(item) => {
+                if item.1.persistent {
+                    // send version request
+                    self.handle_node_found(&item.0);
+                }
+            }
+        }
     }
 
     fn try_update_peer(&mut self, key: &PublicKey, data: &(u64, u64)) -> bool {
