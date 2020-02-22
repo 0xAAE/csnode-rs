@@ -215,7 +215,7 @@ impl Collaboration {
                     else {
                         s = format!("-{}", &data.0 - &data.1);
                     }
-                    info!("{}: S {}, R {}, {}", sender.to_base58(), data.0, data.1, s);
+                    debug!("{}: S {}, R {}, {}", sender.to_base58(), data.0, data.1, s);
                 }
             }
         }
