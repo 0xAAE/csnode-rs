@@ -1,11 +1,11 @@
-use super::super::{PublicKey, PUBLIC_KEY_SIZE};
+use super::super::{PublicKey};
 //use super::super::bitflags;
 //use super::super::blake2s_simd::Hash;
 use std::convert::{TryInto, TryFrom};
 use std::fmt;
 
 extern crate csp2p_rs;
-use csp2p_rs::{NodeId, NODE_ID_SIZE};
+use csp2p_rs::{NodeId};
 
 extern crate num_enum;
 use num_enum::TryFromPrimitive;
@@ -114,25 +114,28 @@ impl fmt::Display for NghbrCmd {
 }
 
 pub struct Packet {
-	sender: Option<Box<PublicKey>>,
+	address: Option<Box<PublicKey>>,
 	data: Vec<u8>
 }
 
 impl Packet {
 
 	pub fn new(id: NodeId, bytes: Vec<u8>) -> Option<Packet> {
+		match Packet::new_broadcast(bytes) {
+			None => None,
+			Some(mut p) => {
+				p.set_address(&id);
+				Some(p)
+			}
+		}
+	}
+
+	pub fn new_broadcast(bytes: Vec<u8>) -> Option<Packet> {
 		if bytes.is_empty() {
 			return None;
 		}
-		let sender: Option<Box<PublicKey>>;
-		if NODE_ID_SIZE == PUBLIC_KEY_SIZE {
-			sender = Some(Box::new(id));
-		}
-		else {
-			sender = None;
-		}
 		Some(Packet {
-			sender: sender,
+			address: None,
 			data: bytes
 		})
 	}
@@ -213,9 +216,9 @@ impl Packet {
 		Some(&self.data[10..])
 	}
 
-	pub fn sender(&self) -> Option<&PublicKey> {
-		if self.sender.is_some() {
-			Some(self.sender.as_ref().unwrap())
+	pub fn address(&self) -> Option<&PublicKey> {
+		if self.address.is_some() {
+			Some(self.address.as_ref().unwrap())
 		}
 		else {
 			None
@@ -224,6 +227,10 @@ impl Packet {
 
 	pub fn data(&self) -> &[u8] {
 		&self.data
+	}
+
+	pub fn set_address(&mut self, node_id: &PublicKey) {
+		self.address = Some(Box::new(*node_id));
 	}
 }
 

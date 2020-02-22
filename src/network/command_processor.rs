@@ -33,7 +33,7 @@ impl CommandProcessor {
                         warn!("unknown command, drop");
                     },
                     Some(v) => {
-                        match p.sender() {
+                        match p.address() {
                             None => {
                                 warn!("cmd::{} has no sender, drop", v.to_string());
                             }
@@ -46,6 +46,10 @@ impl CommandProcessor {
                 };
             }
         }
+    }
+
+    pub fn ping_all(&self) {
+        self.collaboration.ping_all();
     }
 
 }

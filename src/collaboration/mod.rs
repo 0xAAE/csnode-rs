@@ -2,6 +2,7 @@ use std::sync::mpsc::Sender;
 use std::io::Write;
 use std::collections::HashMap;
 use std::sync::RwLock;
+use std::mem::size_of_val;
 
 use log::{debug, info, warn, error};
 
@@ -61,6 +62,37 @@ impl Collaboration {
             Command::NodeFound => self.handle_node_found(sender),
             Command::NodeLost => self.handle_node_lost(sender)
         };
+    }
+
+    pub fn ping_all(&self) {
+        // send ping packet to all neigbours
+        let all = self.neighbours.read().unwrap();
+        for item in all.keys() {
+            let mut output: Vec<u8> = Vec::<u8>::new();
+            match pack_ping(&mut output) {
+                Err(_) => {
+                    error!("failed to serialize ping info");
+                },
+                Ok(_) => {
+                    match Packet::new(*item, output) {
+                        None => {
+                            error!("failed create ping packet");
+                        },
+                        Some(pack) => {
+                            match self.tx_send.send(pack) {
+                                Err(e) => {
+                                    warn!("failed send ping packet to {}: {}", item.to_base58(), e);
+                                },
+                                Ok(_) => {
+                                    debug!("transfer ping packet to {}", item.to_base58());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
     }
 
     fn handle_error(&self, _sender: &PublicKey, _bytes: Option<&[u8]>) {
@@ -172,11 +204,18 @@ impl Collaboration {
                 return;
             }
             Ok(data) => {
-                if !self.try_update_peer(sender, data) {
-                    debug!("peer is not updated");
+                if !self.try_update_peer(sender, &data) {
+                    debug!("{} is not updated", sender.to_base58());
                 }
                 else {
-                    info!("neighbour info updated");
+                    let s: String;
+                    if data.1 >= data.0 {
+                        s = format!("+{}", &data.1 - &data.0);
+                    }
+                    else {
+                        s = format!("-{}", &data.0 - &data.1);
+                    }
+                    debug!("{}: S {}, R {}, {}", sender.to_base58(), data.0, data.1, s);
                 }
             }
         }
@@ -216,11 +255,23 @@ impl Collaboration {
                 return;
             }
         }
-        let mut guard = self.neighbours.write().unwrap();
-        let _ = guard.remove_entry(node_id);
+        let lost_peer;
+        {
+            let mut guard = self.neighbours.write().unwrap();
+            lost_peer = guard.remove_entry(node_id);
+        }
+        match lost_peer {
+            None => (),
+            Some(item) => {
+                if item.1.persistent {
+                    // send version request
+                    self.handle_node_found(&item.0);
+                }
+            }
+        }
     }
 
-    fn try_update_peer(&mut self, key: &PublicKey, data: (u64, u64)) -> bool {
+    fn try_update_peer(&mut self, key: &PublicKey, data: &(u64, u64)) -> bool {
         {
             let guard = self.neighbours.read().unwrap();
             if ! guard.contains_key(key) {
@@ -298,11 +349,44 @@ impl Collaboration {
     }
 }
 
+#[test]
+fn sequencial_serialization() {
+    let mut output = Vec::<u8>::new();
+    let cmd_len = 1 + 1; // flags + cmd
+    output.reserve(cmd_len);
+    assert_eq!(serialize_into(output.by_ref(), &Flags::N.bits()).unwrap(),());
+    assert_eq!(serialize_into(output.by_ref(), &(Command::VersionRequest as u8)).unwrap(), ());
+    let data = [1u8, 2u8, 3u8, 4u8, 5u8];
+    for d in &data {
+        assert_eq!(serialize_into(output.by_ref(), d).unwrap(), ());
+    }
+    assert_eq!(output.len(), 7);
+}
+
+#[test]
+fn sequencial_deserialization() {
+    let data = [1u8, 2u8, 255u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 16u8, 0u8, 0u8, 0u8];
+    let input = &data[..];
+
+    let mut pos = 0;
+    let v1: u8 = deserialize_from(input).unwrap();
+    assert_eq!(v1, 1u8);
+    pos += size_of_val(&v1);
+    let v2: u8 = deserialize_from(&input[pos..]).unwrap();
+    assert_eq!(v2, 2u8);
+    pos += size_of_val(&v2);
+    let v255: u64 = deserialize_from(&input[pos..]).unwrap();
+    assert_eq!(v255, 255);
+    pos += size_of_val(&v255);
+    let v16: u32 = deserialize_from(&input[pos..]).unwrap();
+    assert_eq!(v16, 16);
+}
+
 fn pack_version_request(output: &mut Vec<u8>) -> bincode::Result<()> {
     let cmd_len = 1 + 1; // flags + cmd
     output.reserve(cmd_len);
     serialize_into(output.by_ref(), &Flags::N.bits())?;
-    serialize_into(output.by_ref(), &(Command::VersionReply as u8))?;
+    serialize_into(output.by_ref(), &(Command::VersionRequest as u8))?;
 
     Ok(())
 }
@@ -357,10 +441,15 @@ fn unpack_peer_info(input: &[u8]) -> bincode::Result<PeerInfo> {
     let mut peer_info: PeerInfo = Default::default();
 
     peer_info.version = deserialize_from(input)?;
-    peer_info.uuid = deserialize_from(input)?;
-    peer_info.sequence = deserialize_from(input)?;
-    peer_info.round = deserialize_from(input)?;
-
+    let mut p = size_of_val(&peer_info.version);
+    peer_info.uuid = deserialize_from(&input[p..])?;
+    p += size_of_val(&peer_info.uuid);
+    peer_info.sequence = deserialize_from(&input[p..])?;
+    p += size_of_val(&peer_info.sequence);
+    peer_info.round = deserialize_from(&input[p..])?;
+    p += size_of_val(&peer_info.round);
+    
+    assert_eq!(p, input.len());
     Ok(peer_info)
 }
 
@@ -372,7 +461,10 @@ fn unpack_peer_update(input: &[u8]) -> bincode::Result<(u64, u64)> {
         stream >> info.roundNumber;
     */
     let seq: u64 = deserialize_from(input)?;
-    let round: u64 = deserialize_from(input)?;
-    
+    let mut p = size_of_val(&seq);
+    let round: u64 = deserialize_from(&input[p..])?;
+    p += size_of_val(&round);
+
+    assert_eq!(p, input.len());
     Ok((seq, round))
 }

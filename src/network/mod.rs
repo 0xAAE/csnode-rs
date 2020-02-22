@@ -8,6 +8,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::str::FromStr;
+use std::time::Instant;
 use log::info;
 
 extern crate base58;
@@ -17,6 +18,7 @@ extern crate csp2p_rs;
 use csp2p_rs::{CSHost, NodeInfo, NodeId, RawPacket};
 
 pub const TEST_STOP_DELAY_SEC: u64 = 2;
+const PING_NEIGHBOURS_DELAY_MS: u64 = 1900;
 const MAX_MSG_QUEUE: usize = 1024;
 const MAX_CMD_QUEUE: usize = 1024;
 
@@ -36,7 +38,8 @@ pub struct Network {
 	neighbours_thread: 	JoinHandle<()>,
 	processor_thread:	JoinHandle<()>,
 	sender_thread:		JoinHandle<()>,
-	stop_flag: Arc<AtomicBool>
+    stop_flag:          Arc<AtomicBool>,
+    host:               CSHost
 }
 
 impl Network {
@@ -72,17 +75,20 @@ impl Network {
 		host.add_known_hosts(known_hosts);
 		host.start();
 		
-		let instance = Box::new(Network {
-			stop_flag: stop_flag_instance.clone(),
-			collect_thread: start_collect(conf.clone(), stop_flag_instance.clone(), rx_raw, tx_cmd, tx_msg),
-			neighbours_thread: start_neighbourhood(conf.clone(), stop_flag_instance.clone(), rx_cmd, tx_send.clone()),
-			processor_thread: start_msg_processor(conf.clone(), stop_flag_instance.clone(), rx_msg, tx_send),
-			sender_thread: start_sender(conf.clone(), stop_flag_instance.clone(), rx_send)
-		});
+		let instance = Box::new(
+            Network {
+                stop_flag: stop_flag_instance.clone(),
+                collect_thread: start_collect(conf.clone(), stop_flag_instance.clone(), rx_raw, tx_cmd, tx_msg),
+                neighbours_thread: start_neighbourhood(conf.clone(), stop_flag_instance.clone(), rx_cmd, tx_send.clone()),
+                processor_thread: start_msg_processor(conf.clone(), stop_flag_instance.clone(), rx_msg, tx_send),
+                sender_thread: start_sender(conf.clone(), stop_flag_instance.clone(), rx_send),
+                host: host
+            });
 		instance
 	}
 
-	pub fn stop(self) {
+	pub fn stop(mut self) {
+        self.host.stop();
 		self.stop_flag.store(true, Ordering::SeqCst);
 		self.collect_thread.join().expect("Failed to stop packet collector");
 		self.neighbours_thread.join().expect("Failed to stop neihbourhood");
@@ -115,7 +121,13 @@ fn start_neighbourhood(conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: R
 	let handle = spawn(move || {
         info!("Neighbourhood started");
         let mut neighbourhood = command_processor::CommandProcessor::new(conf.clone(), rx_cmd, tx_send);
+        let mut prev_ping = Instant::now();
         loop {
+            let ping_pause = prev_ping.elapsed();
+            if ping_pause.as_millis() as u64 >= PING_NEIGHBOURS_DELAY_MS {
+                neighbourhood.ping_all();
+                prev_ping = Instant::now();
+            }
             neighbourhood.recv();
             if stop_flag.load(Ordering::SeqCst) {
                 break;
