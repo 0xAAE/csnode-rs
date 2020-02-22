@@ -40,7 +40,7 @@ impl MessageProcessor {
                                 warn!("malformed message, round not set, drop");
                             }
                             Some(r) => {
-                                match p.sender() {
+                                match p.address() {
                                     None => {
                                         warn!("unknown sender, drop");
                                     }

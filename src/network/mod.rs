@@ -8,6 +8,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::str::FromStr;
+use std::time::Instant;
 use log::info;
 
 extern crate base58;
@@ -17,6 +18,7 @@ extern crate csp2p_rs;
 use csp2p_rs::{CSHost, NodeInfo, NodeId, RawPacket};
 
 pub const TEST_STOP_DELAY_SEC: u64 = 2;
+const PING_NEIGHBOURS_DELAY_MS: u64 = 1900;
 const MAX_MSG_QUEUE: usize = 1024;
 const MAX_CMD_QUEUE: usize = 1024;
 
@@ -119,7 +121,13 @@ fn start_neighbourhood(conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: R
 	let handle = spawn(move || {
         info!("Neighbourhood started");
         let mut neighbourhood = command_processor::CommandProcessor::new(conf.clone(), rx_cmd, tx_send);
+        let mut prev_ping = Instant::now();
         loop {
+            let ping_pause = prev_ping.elapsed();
+            if ping_pause.as_millis() as u64 >= PING_NEIGHBOURS_DELAY_MS {
+                neighbourhood.ping_all();
+                prev_ping = Instant::now();
+            }
             neighbourhood.recv();
             if stop_flag.load(Ordering::SeqCst) {
                 break;

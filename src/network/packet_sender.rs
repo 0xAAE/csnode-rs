@@ -6,6 +6,9 @@ use log::debug;
 use super::TEST_STOP_DELAY_SEC;
 use super::packet::Packet;
 
+extern crate base58;
+use base58::ToBase58; // [u8].to_base58()
+
 extern crate csp2p_rs;
 use csp2p_rs::{CSHost};
 
@@ -24,14 +27,14 @@ impl PacketSender {
         match self.rx_send.recv_timeout(Duration::from_secs(TEST_STOP_DELAY_SEC)) {
 			Err(_) => (),
 			Ok(pack) => {
-                match pack.sender() {
+                match pack.address() {
                     None => {
                         debug!("-> broadcast packet");
                         CSHost::broadcast(pack.data());
                     }
                     Some(id) => {
                         CSHost::send_to(id, pack.data());
-                        debug!("-> send packet to specific node");
+                        debug!("-> send packet to {}", id.to_base58());
                     }
                 }
                 // todo send packet to "raw"

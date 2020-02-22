@@ -63,6 +63,37 @@ impl Collaboration {
         };
     }
 
+    pub fn ping_all(&self) {
+        // send ping packet to all neigbours
+        let all = self.neighbours.read().unwrap();
+        for item in all.keys() {
+            let mut output: Vec<u8> = Vec::<u8>::new();
+            match pack_ping(&mut output) {
+                Err(_) => {
+                    error!("failed to serialize ping info");
+                },
+                Ok(_) => {
+                    match Packet::new(*item, output) {
+                        None => {
+                            error!("failed create ping packet");
+                        },
+                        Some(pack) => {
+                            match self.tx_send.send(pack) {
+                                Err(e) => {
+                                    warn!("failed send ping packet to {}: {}", item.to_base58(), e);
+                                },
+                                Ok(_) => {
+                                    debug!("transfer ping packet to {}", item.to_base58());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+
     fn handle_error(&self, _sender: &PublicKey, _bytes: Option<&[u8]>) {
 
     }
@@ -302,7 +333,7 @@ fn pack_version_request(output: &mut Vec<u8>) -> bincode::Result<()> {
     let cmd_len = 1 + 1; // flags + cmd
     output.reserve(cmd_len);
     serialize_into(output.by_ref(), &Flags::N.bits())?;
-    serialize_into(output.by_ref(), &(Command::VersionReply as u8))?;
+    serialize_into(output.by_ref(), &(Command::VersionRequest as u8))?;
 
     Ok(())
 }
