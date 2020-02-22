@@ -30,9 +30,15 @@ impl CoreLogic {
         }
         match msg {
             MsgType::BootstrapTable => self.handle_bootstrap_table(sender, rnd, bytes),
-            // MsgType::Transactions,
-            // MsgType::FirstTransaction,
-            // MsgType::NewBlock,
+            MsgType::Transactions => {
+                info!("obsolete MsgType::Transactions received")
+            },
+            MsgType::FirstTransaction => {
+                info!("obsolete MsgType::FirstTransaction received")
+            },
+            MsgType::NewBlock => {
+                info!("obsolete MsgType::NewBlock received")
+            },
             // MsgType::BlockHash,
             // MsgType::BlockRequest,
             // MsgType::RequestedBlock,
@@ -47,21 +53,17 @@ impl CoreLogic {
             MsgType::TransactionPacket => self.handle_transaction_packet(sender, rnd, bytes),
             // MsgType::TransactionsPacketRequest,
             // MsgType::TransactionsPacketReply,
-            // MsgType::NewCharacteristic,
-            // MsgType::WriterNotification,
+            MsgType::NewCharacteristic => {
+                info!("obsolete MsgType::NewCharacteristic received")
+            },
+            MsgType::WriterNotification => {
+                info!("obsolete MsgType::WriterNotification received")
+            },
             // MsgType::FirstSmartStage,
             // MsgType::SecondSmartStage,
             MsgType::RoundTable => self.handle_round_table(sender, rnd, bytes),
             // MsgType::ThirdSmartStage,
-            // MsgType::SmartFirstStageRequest,
-            // MsgType::SmartSecondStageRequest,
-            // MsgType::SmartThirdStageRequest,
-            // MsgType::HashReply,
-            // MsgType::RejectedContracts,
-            // MsgType::RoundPackRequest,
-            // MsgType::StateRequest,
-            // MsgType::StateReply,
-            // MsgType::Utility,
+            // MsgType::SmartFirstStageRequest,ply
             // MsgType::EmptyRoundPack,
             // MsgType::BlockAlarm,
             // MsgType::EventReport,
@@ -73,8 +75,21 @@ impl CoreLogic {
     fn test_packet_round(&self, rnd: u64, msg: &MsgType) -> bool {
         let cur = self.round.current();
         match msg {
-            MsgType::BootstrapTable => { rnd >= cur },
-            _ => rnd > cur
+            // some packets are allowed from any round number:
+            MsgType::RoundTableRequest => true,
+            MsgType::RoundTableReply => true,
+            MsgType::TransactionPacket => true,
+            MsgType::TransactionsPacketReply => true,
+            MsgType::TransactionsPacketRequest => true,
+            MsgType::BlockRequest => true,
+            MsgType::RequestedBlock => true,
+            MsgType::StateRequest => true,
+            MsgType::StateReply => true,
+            MsgType::EmptyRoundPack => true,
+            MsgType::BlockAlarm => true,
+            MsgType::EventReport => true,
+            // most of packets are allowed only from current or outrunning round:
+            _ => rnd >= cur
         }
     }
 
