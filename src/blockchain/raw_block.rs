@@ -44,6 +44,24 @@ fn validate(bytes: &[u8]) -> bool {
         return false;
     }
     // transactions
+    if total < pos + 4 {
+        return false;
+    }
+    let t_cnt: u32 = deserialize_from(&bytes[pos..]).unwrap_or(std::u32::MAX);
+    if t_cnt == std::u32::MAX {
+        return false;
+    }
+    pos += 4;
+    for _ in 0..t_cnt {
+        match validate_transaction(&bytes[pos..]) {
+            None => {
+                return false;
+            },
+            Some(len) => {
+                pos += len;
+            }
+        }
+    }
 
     total == pos
 }
