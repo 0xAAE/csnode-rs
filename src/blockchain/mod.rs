@@ -2,6 +2,7 @@ use std::sync::{Arc, RwLock};
 
 pub mod blocks;
 pub mod caches;
+mod raw_block;
 
 //extern crate ruspiro_singleton;
 //use ruspiro_singleton::Singleton;
