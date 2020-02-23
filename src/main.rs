@@ -6,9 +6,10 @@ use log::info;
 
 extern crate blake2s_simd;
 
+mod primitive;
+use primitive::{PublicKey, Hash, Signature};
 mod config;
 use config::SharedConfig;
-
 mod logger;
 mod network;
 use network::TEST_STOP_DELAY_SEC;
@@ -26,11 +27,6 @@ use std::time;
 
 const NODE_VERSION: u16 = 502;
 const UUID_TESTNET: u64 = 5283967947175248524;
-pub const PUBLIC_KEY_SIZE: usize = 32;
-pub const HASH_SIZE: usize = 32;
-
-pub type PublicKey = [u8; PUBLIC_KEY_SIZE];
-//pub type Hash = [u8; HASH_SIZE]; // hash is defined in blake2s
 //static ZERO_PUBLIC_KEY: PublicKey = [0u8; PUBLIC_KEY_SIZE];
 
 fn main() {
@@ -59,6 +55,7 @@ fn main() {
 
     // init current state
     let caches: SharedCaches = Arc::new(RwLock::new(blockchain::caches::Caches::new()));
+    
     // run config observer thread:
     let config_observer = start_config_observer_thread(conf.clone(), stop_flag.clone());
     
