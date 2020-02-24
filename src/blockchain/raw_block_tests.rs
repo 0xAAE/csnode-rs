@@ -1,10 +1,13 @@
 #[cfg(test)]
-
 use super::raw_block::{validate_user_fields, validate_transaction, validate_raw_block};
+#[cfg(test)]
 use super::super::primitive::{HASH_SIZE, PUBLIC_KEY_SIZE, SIGNATURE_SIZE};
+#[cfg(test)]
 use bincode::serialize_into;
+#[cfg(test)]
 use std::io::Write;
 
+#[cfg(test)]
 fn mock_serialize_user_fields_to(bytes: &mut Vec<u8>) {
     serialize_into(bytes.by_ref(), &3u8).unwrap();
     serialize_into(bytes.by_ref(), &10u32).unwrap();
@@ -21,6 +24,7 @@ fn mock_serialize_user_fields_to(bytes: &mut Vec<u8>) {
     serialize_into(bytes.by_ref(), &14u64).unwrap();
 }
 
+#[cfg(test)]
 fn mock_serialize_transaction_to(bytes: &mut Vec<u8>, src_id: bool, tgt_id: bool) {
     serialize_into(bytes.by_ref(), &3u16).unwrap(); // lo
     let mut hi: u32 = 10;
@@ -53,6 +57,7 @@ fn mock_serialize_transaction_to(bytes: &mut Vec<u8>, src_id: bool, tgt_id: bool
     serialize_into(bytes.by_ref(), &17552u16).unwrap();
 }
 
+#[cfg(test)]
 fn mock_serialize_raw_block_to(bytes: &mut Vec<u8>) {
     serialize_into(bytes.by_ref(), &0u8).unwrap();
     serialize_into(bytes.by_ref(), &[214u8; HASH_SIZE]).unwrap();
