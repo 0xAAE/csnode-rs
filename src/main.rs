@@ -59,9 +59,9 @@ fn main() {
     
     // run config observer thread:
     let config_observer = start_config_observer_thread(conf.clone(), stop_flag.clone());
-    
+
     // run network (which in its turn will start all necessary own threads)
-    let network = start_network_thread(conf.clone(), stop_flag.clone());
+    let network = start_network_thread(conf.clone(), stop_flag.clone(), blocks.clone());
 
     // imitate other work: sleep too long and exit
     thread::sleep(time::Duration::from_secs(300));
@@ -102,10 +102,10 @@ fn start_config_observer_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>
     handle
 }
 
-fn start_network_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
+fn start_network_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>, blocks: SharedBlocks) -> JoinHandle<()> {
     info!("Start network");
     let handle = spawn(move || {
-        let net = network::Network::new(config);
+        let net = network::Network::new(config, blocks);
         info!("Network started");
         loop {
             thread::sleep(time::Duration::from_secs(TEST_STOP_DELAY_SEC));

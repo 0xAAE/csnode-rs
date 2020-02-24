@@ -10,6 +10,7 @@ use super::config::SharedConfig;
 use super::PublicKey;
 use super::{NODE_VERSION, UUID_TESTNET};
 use super::network::packet::{Flags, Packet};
+use super::blockchain::SharedBlocks;
 
 extern crate bincode;
 use bincode::{serialize_into, deserialize_from};
@@ -37,18 +38,20 @@ pub struct Collaboration {
     sequence: u64,
     round: u64,
     neighbours: RwLock<HashMap<PublicKey, PeerInfo>>,
-    config: SharedConfig
+    config: SharedConfig,
+    blocks: SharedBlocks
 }
 
 impl Collaboration {
 
-    pub fn new(conf: SharedConfig, tx_send: Sender<Packet>) -> Collaboration {
+    pub fn new(conf: SharedConfig, tx_send: Sender<Packet>, blocks: SharedBlocks) -> Collaboration {
         Collaboration {
             tx_send: tx_send,
             sequence: 0,
             round: 0,
             neighbours: RwLock::new(HashMap::<PublicKey, PeerInfo>::new()),
-            config: conf
+            config: conf,
+            blocks: blocks
         }
     }
 

@@ -9,6 +9,7 @@ use super::packet::Packet;
 // top-level modules
 use super::super::config::SharedConfig;
 use super::super::core_logic::CoreLogic;
+use super::SharedBlocks;
 
 pub struct MessageProcessor {
     rx_msg: Receiver<Packet>,
@@ -18,11 +19,11 @@ pub struct MessageProcessor {
 
 impl MessageProcessor {
 
-    pub fn new(conf: SharedConfig, rx_msg: Receiver<Packet>, tx_send:Sender<Packet>) -> MessageProcessor {
+    pub fn new(conf: SharedConfig, rx_msg: Receiver<Packet>, tx_send:Sender<Packet>, blocks: SharedBlocks) -> MessageProcessor {
         MessageProcessor {
             rx_msg: rx_msg,
             tx_send: tx_send.clone(),
-            logic: CoreLogic::new(conf, tx_send)
+            logic: CoreLogic::new(conf, tx_send, blocks)
         }
     }
 

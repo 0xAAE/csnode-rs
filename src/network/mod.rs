@@ -24,8 +24,7 @@ const MAX_CMD_QUEUE: usize = 1024;
 
 pub mod packet;
 use packet::Packet;
-
-//mod fragment_receiver;
+use super::SharedBlocks;
 
 mod packet_collector;
 mod command_processor;
@@ -43,7 +42,7 @@ pub struct Network {
 }
 
 impl Network {
-	pub fn new(conf: SharedConfig) -> Box<Network> {
+	pub fn new(conf: SharedConfig, blocks: SharedBlocks) -> Box<Network> {
 		let stop_flag_instance = Arc::new(AtomicBool::new(false));
         // p2p-compat -> packet_collector channel, fully async:
         let (tx_raw, rx_raw) = channel::<RawPacket>();
@@ -79,8 +78,8 @@ impl Network {
             Network {
                 stop_flag: stop_flag_instance.clone(),
                 collect_thread: start_collect(conf.clone(), stop_flag_instance.clone(), rx_raw, tx_cmd, tx_msg),
-                neighbours_thread: start_neighbourhood(conf.clone(), stop_flag_instance.clone(), rx_cmd, tx_send.clone()),
-                processor_thread: start_msg_processor(conf.clone(), stop_flag_instance.clone(), rx_msg, tx_send),
+                neighbours_thread: start_neighbourhood(conf.clone(), stop_flag_instance.clone(), rx_cmd, tx_send.clone(), blocks.clone()),
+                processor_thread: start_msg_processor(conf.clone(), stop_flag_instance.clone(), rx_msg, tx_send, blocks),
                 sender_thread: start_sender(conf.clone(), stop_flag_instance.clone(), rx_send),
                 host: host
             });
@@ -116,11 +115,11 @@ fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>,
 	handle
 }
 
-fn start_neighbourhood(conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: Receiver<Packet>, tx_send: Sender<Packet>) -> JoinHandle<()> {
+fn start_neighbourhood(conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: Receiver<Packet>, tx_send: Sender<Packet>, blocks: SharedBlocks) -> JoinHandle<()> {
 	info!("Start neighbourhood service");
 	let handle = spawn(move || {
         info!("Neighbourhood started");
-        let mut neighbourhood = command_processor::CommandProcessor::new(conf.clone(), rx_cmd, tx_send);
+        let mut neighbourhood = command_processor::CommandProcessor::new(conf.clone(), rx_cmd, tx_send, blocks);
         let mut prev_ping = Instant::now();
         loop {
             let ping_pause = prev_ping.elapsed();
@@ -138,11 +137,12 @@ fn start_neighbourhood(conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: R
 	handle
 }
 
-fn start_msg_processor(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_msg: Receiver<Packet>, tx_send: Sender<Packet>) -> JoinHandle<()> {
+fn start_msg_processor(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_msg: Receiver<Packet>,
+        tx_send: Sender<Packet>, blocks: SharedBlocks) -> JoinHandle<()> {
 	info!("Start message processor");
 	let handle = spawn(move || {
         info!("Message processor started");
-        let mut msg_processor = message_processor::MessageProcessor::new(_conf.clone(), rx_msg, tx_send);
+        let mut msg_processor = message_processor::MessageProcessor::new(_conf.clone(), rx_msg, tx_send, blocks);
         loop {
             msg_processor.recv();
             if stop_flag.load(Ordering::SeqCst) {

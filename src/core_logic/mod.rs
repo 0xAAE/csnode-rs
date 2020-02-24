@@ -5,6 +5,7 @@ use log::{debug, info};
 use super::config::SharedConfig;
 use super::PublicKey;
 use super::network::packet::{Packet, MsgType};
+use super::SharedBlocks;
 
 mod round;
 use round::Round;
@@ -12,15 +13,17 @@ use round::Round;
 pub struct CoreLogic {
     tx_send: Sender<Packet>,
     config: SharedConfig,
-    round: Round
+    round: Round,
+    blocks: SharedBlocks
 }
 
 impl CoreLogic {
-    pub fn new(conf: SharedConfig, tx_send: Sender<Packet>) -> CoreLogic {
+    pub fn new(conf: SharedConfig, tx_send: Sender<Packet>, blocks: SharedBlocks) -> CoreLogic {
         CoreLogic {
             tx_send: tx_send,
             config: conf,
-            round: Round::new()
+            round: Round::new(),
+            blocks: blocks
         }
     }
 

@@ -9,6 +9,7 @@ use super::packet::Packet;
 // top-level modules
 use super::super::config::SharedConfig;
 use super::super::collaboration::Collaboration;
+use super::super::SharedBlocks;
 
 pub struct CommandProcessor {
     rx_cmd: Receiver<Packet>,
@@ -17,10 +18,10 @@ pub struct CommandProcessor {
 
 impl CommandProcessor {
 
-    pub fn new(conf: SharedConfig, rx_cmd: Receiver<Packet>, tx_send: Sender<Packet>) -> CommandProcessor {
+    pub fn new(conf: SharedConfig, rx_cmd: Receiver<Packet>, tx_send: Sender<Packet>, blocks: SharedBlocks) -> CommandProcessor {
         CommandProcessor {
             rx_cmd: rx_cmd,
-            collaboration: Collaboration::new(conf, tx_send)
+            collaboration: Collaboration::new(conf, tx_send, blocks)
         }
     }
 
