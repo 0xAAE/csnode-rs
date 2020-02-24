@@ -89,7 +89,7 @@
 ///             n:                  u8
 ///             sig:                Signature
 ///         ] * trusted_cnt
-///     ] * count_confirm
+///     ] * count_contract_sig
 
 use super::raw_block::RawBlock;
 

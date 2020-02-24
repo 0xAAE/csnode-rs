@@ -1,6 +1,7 @@
+use std::mem::{size_of_val, size_of};
 use super::super::primitive::{HASH_SIZE, PUBLIC_KEY_SIZE, SIGNATURE_SIZE};
 
-use bincode::{deserialize_from, serialize_into};
+use bincode::deserialize_from;
 
 pub struct RawBlock {
     pub data: Vec<u8>
@@ -9,7 +10,7 @@ pub struct RawBlock {
 impl RawBlock {
 
     pub fn new(bytes: Vec<u8>) -> Option<RawBlock> {
-        if ! validate(&bytes[..]) {
+        if ! validate_raw_block(&bytes[..]) {
             return None;
         }
         Some(RawBlock {
@@ -20,13 +21,13 @@ impl RawBlock {
 
 }
 
-fn validate(bytes: &[u8]) -> bool {
+pub fn validate_raw_block(bytes: &[u8]) -> bool {
     let total = bytes.len();
 
     let mut pos =
-        1 +         // version
-        HASH_SIZE + // prev hash
-        8;          // sequence
+        size_of::<u8>() +   // version
+        HASH_SIZE +         // prev hash
+        size_of::<u64>();   // sequence
     if total <= pos {
         return false;
     }
@@ -39,19 +40,17 @@ fn validate(bytes: &[u8]) -> bool {
             pos += len;
         }
     }
-    pos += 12;     // round cost (money)
+    let sizeof_money = size_of::<u32>() + size_of::<u64>();
+    pos += sizeof_money;     // round cost (money)
     if total <= pos {
         return false;
     }
     // transactions
-    if total < pos + 4 {
+    if total < pos + size_of::<u32>() {
         return false;
     }
-    let t_cnt: u32 = deserialize_from(&bytes[pos..]).unwrap_or(std::u32::MAX);
-    if t_cnt == std::u32::MAX {
-        return false;
-    }
-    pos += 4;
+    let t_cnt: u32 = deserialize_from(&bytes[pos..]).unwrap();
+    pos += size_of_val(&t_cnt);
     for _ in 0..t_cnt {
         match validate_transaction(&bytes[pos..]) {
             None => {
@@ -63,12 +62,56 @@ fn validate(bytes: &[u8]) -> bool {
         }
     }
 
+    // introduced new wallets
+    if total < pos + size_of::<u32>() {
+        return false;
+    }
+    let w_cnt: u32 = deserialize_from(&bytes[pos..]).unwrap();
+    pos += size_of_val(&w_cnt) + w_cnt as usize * (size_of::<u32>() + size_of::<u64>());
+
+    // trusted info
+    if total < pos + size_of::<u8>() + size_of::<u64>() {
+        return false;
+    } 
+
+    // trusted info - consensus
+    let consensus_cnt: u8 = deserialize_from(&bytes[pos..]).unwrap();
+    let consensus_bits: u64 = deserialize_from(&bytes[pos + size_of_val(&consensus_cnt)..]).unwrap();
+    let sig_blk_cnt = consensus_bits.count_ones() as usize;
+    pos += size_of_val(&consensus_cnt) + size_of_val(&consensus_bits) + (consensus_cnt as usize * PUBLIC_KEY_SIZE);
+    // trusted info - next RT
+    if total < pos + size_of::<u8>() + size_of::<u64>() {
+        return false;
+    }
+    let rt_cnt: u8 = deserialize_from(&bytes[pos..]).unwrap();
+    let rt_bits: u64 = deserialize_from(&bytes[pos + size_of_val(&rt_cnt)..]).unwrap();
+    let sig_rt_cnt = rt_bits.count_ones() as usize;
+    pos += size_of_val(&rt_cnt) + size_of_val(&rt_bits) + sig_rt_cnt * SIGNATURE_SIZE;
+    // hashed length
+    pos += size_of::<usize>();
+    // signatures
+    pos += sig_blk_cnt * SIGNATURE_SIZE;
+    // contract signatures
+    if total < pos + 1 {
+        return false;
+    }
+    let contr_cnt: u8 = deserialize_from(&bytes[pos..]).unwrap();
+    pos += size_of_val(&contr_cnt);
+    for _ in 0..contr_cnt {
+        pos += PUBLIC_KEY_SIZE + size_of::<u64>();
+        if total < pos {
+            return false;
+        }
+        let item_sig_cnt: u8 = deserialize_from(&bytes[pos..]).unwrap();
+        pos += size_of_val(&item_sig_cnt) + (size_of::<u8>() + SIGNATURE_SIZE) * item_sig_cnt as usize;
+    }
+
     total == pos
 }
 
 /// None - failed to validate
 /// Some(pos) - the position immediately after user fields, which starts from 1, pos[0] is fileds count
-fn validate_user_fields(bytes: &[u8]) -> Option<usize> {
+pub fn validate_user_fields(bytes: &[u8]) -> Option<usize> {
     let total = bytes.len();
     if total <= 0 {
         return None;
@@ -110,35 +153,9 @@ fn validate_user_fields(bytes: &[u8]) -> Option<usize> {
     Some(pos)
 }
 
-#[test]
-fn test_validate_user_fields() {
-    let mut bytes = Vec::<u8>::new();
-    serialize_into(&mut bytes, &3u8).unwrap();
-    serialize_into(&mut bytes, &10u32).unwrap();
-    serialize_into(&mut bytes, &1u8).unwrap();
-    serialize_into(&mut bytes, &11u64).unwrap();
-    serialize_into(&mut bytes, &20u32).unwrap();
-    serialize_into(&mut bytes, &2u8).unwrap();
-    let l = bytes.len() as u32;
-    serialize_into(&mut bytes, &l).unwrap();
-    bytes.extend_from_slice(&bytes.clone()[..l as usize]);
-    serialize_into(&mut bytes, &30u32).unwrap();
-    serialize_into(&mut bytes, &3u8).unwrap();
-
-    assert_eq!(validate_user_fields(&bytes[..]), None);
-
-    serialize_into(&mut bytes, &12u32).unwrap();
-
-    assert_eq!(validate_user_fields(&bytes[..]), None);
-
-    serialize_into(&mut bytes, &14u64).unwrap();
-
-    assert_eq!(validate_user_fields(&bytes[..]), Some(bytes.len()));
-}
-
 /// None - failed to validate
 /// Some(pos) - th eposition immediately after transaction
-fn validate_transaction(bytes: &[u8]) -> Option<usize> {
+pub fn validate_transaction(bytes: &[u8]) -> Option<usize> {
     let total = bytes.len();
     if total <= 6 {
         return None;
@@ -186,170 +203,3 @@ fn validate_transaction(bytes: &[u8]) -> Option<usize> {
     Some(pos)
 }
 
-#[test]
-fn test_validate_transaction_id_id() {
-    let mut bytes = Vec::<u8>::new();
-    serialize_into(&mut bytes, &3u16).unwrap(); // lo
-    let hi: u32 = 0x8000_0000 + 0x4000_0000 + 10;
-    serialize_into(&mut bytes, &hi).unwrap();
-
-    let src = 55u32; // [1u8; PUBLIC_KEY_SIZE];
-    // bytes.extend_from_slice(&src);
-    serialize_into(&mut bytes, &src).unwrap();
-
-    let tgt = 88u32; // [2u8; PUBLIC_KEY_SIZE];
-    // bytes.extend_from_slice(&tgt);
-    serialize_into(&mut bytes, &tgt).unwrap();
-
-    serialize_into(&mut bytes, &19u32).unwrap();
-    serialize_into(&mut bytes, &29u64).unwrap();
-    serialize_into(&mut bytes, &15771u16).unwrap();
-    serialize_into(&mut bytes, &1u8).unwrap();
-    // user fields
-    serialize_into(&mut bytes, &3u8).unwrap();
-    serialize_into(&mut bytes, &10u32).unwrap();
-    serialize_into(&mut bytes, &1u8).unwrap();
-    serialize_into(&mut bytes, &11u64).unwrap();
-    serialize_into(&mut bytes, &20u32).unwrap();
-    serialize_into(&mut bytes, &2u8).unwrap();
-    let l = bytes.len() as u32;
-    serialize_into(&mut bytes, &l).unwrap();
-    bytes.extend_from_slice(&bytes.clone()[..l as usize]);
-    serialize_into(&mut bytes, &30u32).unwrap();
-    serialize_into(&mut bytes, &3u8).unwrap();
-    serialize_into(&mut bytes, &12u32).unwrap();
-    serialize_into(&mut bytes, &14u64).unwrap();
-    let sig = [17u8; SIGNATURE_SIZE];
-    bytes.extend_from_slice(&sig[..]);
-
-    assert_eq!(validate_user_fields(&bytes[..]), None);
-
-    serialize_into(&mut bytes, &17552u16).unwrap();
-
-    assert_eq!(validate_transaction(&bytes[..]), Some(bytes.len()));
-}
-
-#[test]
-fn test_validate_transaction_pk_id() {
-    let mut bytes = Vec::<u8>::new();
-    serialize_into(&mut bytes, &3u16).unwrap(); // lo
-    let hi: u32 = 0x4000_0000 + 10;
-    serialize_into(&mut bytes, &hi).unwrap();
-
-    let src = [1u8; PUBLIC_KEY_SIZE];
-    bytes.extend_from_slice(&src);
-
-    let tgt = 88u32; // [2u8; PUBLIC_KEY_SIZE];
-    serialize_into(&mut bytes, &tgt).unwrap();
-
-    serialize_into(&mut bytes, &19u32).unwrap();
-    serialize_into(&mut bytes, &29u64).unwrap();
-    serialize_into(&mut bytes, &15771u16).unwrap();
-    serialize_into(&mut bytes, &1u8).unwrap();
-    // user fields
-    serialize_into(&mut bytes, &3u8).unwrap();
-    serialize_into(&mut bytes, &10u32).unwrap();
-    serialize_into(&mut bytes, &1u8).unwrap();
-    serialize_into(&mut bytes, &11u64).unwrap();
-    serialize_into(&mut bytes, &20u32).unwrap();
-    serialize_into(&mut bytes, &2u8).unwrap();
-    let l = bytes.len() as u32;
-    serialize_into(&mut bytes, &l).unwrap();
-    bytes.extend_from_slice(&bytes.clone()[..l as usize]);
-    serialize_into(&mut bytes, &30u32).unwrap();
-    serialize_into(&mut bytes, &3u8).unwrap();
-    serialize_into(&mut bytes, &12u32).unwrap();
-    serialize_into(&mut bytes, &14u64).unwrap();
-    let sig = [17u8; SIGNATURE_SIZE];
-    bytes.extend_from_slice(&sig[..]);
-
-    assert_eq!(validate_user_fields(&bytes[..]), None);
-
-    serialize_into(&mut bytes, &17552u16).unwrap();
-
-    assert_eq!(validate_transaction(&bytes[..]), Some(bytes.len()));
-}
-
-#[test]
-fn test_validate_transaction_id_pk() {
-    let mut bytes = Vec::<u8>::new();
-    serialize_into(&mut bytes, &3u16).unwrap(); // lo
-    let hi: u32 = 0x8000_0000 + 10;
-    serialize_into(&mut bytes, &hi).unwrap();
-
-    let src = 55u32; // [1u8; PUBLIC_KEY_SIZE];
-    serialize_into(&mut bytes, &src).unwrap();
-
-    let tgt = [2u8; PUBLIC_KEY_SIZE];
-    bytes.extend_from_slice(&tgt);
-
-    serialize_into(&mut bytes, &19u32).unwrap();
-    serialize_into(&mut bytes, &29u64).unwrap();
-    serialize_into(&mut bytes, &15771u16).unwrap();
-    serialize_into(&mut bytes, &1u8).unwrap();
-    // user fields
-    serialize_into(&mut bytes, &3u8).unwrap();
-    serialize_into(&mut bytes, &10u32).unwrap();
-    serialize_into(&mut bytes, &1u8).unwrap();
-    serialize_into(&mut bytes, &11u64).unwrap();
-    serialize_into(&mut bytes, &20u32).unwrap();
-    serialize_into(&mut bytes, &2u8).unwrap();
-    let l = bytes.len() as u32;
-    serialize_into(&mut bytes, &l).unwrap();
-    bytes.extend_from_slice(&bytes.clone()[..l as usize]);
-    serialize_into(&mut bytes, &30u32).unwrap();
-    serialize_into(&mut bytes, &3u8).unwrap();
-    serialize_into(&mut bytes, &12u32).unwrap();
-    serialize_into(&mut bytes, &14u64).unwrap();
-    let sig = [17u8; SIGNATURE_SIZE];
-    bytes.extend_from_slice(&sig[..]);
-
-    assert_eq!(validate_user_fields(&bytes[..]), None);
-
-    serialize_into(&mut bytes, &17552u16).unwrap();
-
-    assert_eq!(validate_transaction(&bytes[..]), Some(bytes.len()));
-}
-
-#[test]
-fn test_validate_transaction_pk_pk() {
-    let mut bytes = Vec::<u8>::new();
-    serialize_into(&mut bytes, &3u16).unwrap(); // lo
-    let hi: u32 = 10;
-    serialize_into(&mut bytes, &hi).unwrap();
-
-    let src = [1u8; PUBLIC_KEY_SIZE];
-    bytes.extend_from_slice(&src);
-    //serialize_into(&mut bytes, &src).unwrap();
-
-    let tgt = [2u8; PUBLIC_KEY_SIZE];
-    bytes.extend_from_slice(&tgt);
-    //serialize_into(&mut bytes, &tgt).unwrap();
-
-    serialize_into(&mut bytes, &19u32).unwrap();
-    serialize_into(&mut bytes, &29u64).unwrap();
-    serialize_into(&mut bytes, &15771u16).unwrap();
-    serialize_into(&mut bytes, &1u8).unwrap();
-    // user fields
-    serialize_into(&mut bytes, &3u8).unwrap();
-    serialize_into(&mut bytes, &10u32).unwrap();
-    serialize_into(&mut bytes, &1u8).unwrap();
-    serialize_into(&mut bytes, &11u64).unwrap();
-    serialize_into(&mut bytes, &20u32).unwrap();
-    serialize_into(&mut bytes, &2u8).unwrap();
-    let l = bytes.len() as u32;
-    serialize_into(&mut bytes, &l).unwrap();
-    bytes.extend_from_slice(&bytes.clone()[..l as usize]);
-    serialize_into(&mut bytes, &30u32).unwrap();
-    serialize_into(&mut bytes, &3u8).unwrap();
-    serialize_into(&mut bytes, &12u32).unwrap();
-    serialize_into(&mut bytes, &14u64).unwrap();
-    let sig = [17u8; SIGNATURE_SIZE];
-    bytes.extend_from_slice(&sig[..]);
-
-    assert_eq!(validate_user_fields(&bytes[..]), None);
-
-    serialize_into(&mut bytes, &17552u16).unwrap();
-
-    assert_eq!(validate_transaction(&bytes[..]), Some(bytes.len()));
-}
