@@ -8,21 +8,27 @@ use super::network::packet::{Packet, MsgType};
 use super::SharedBlocks;
 
 mod round;
+pub use round::SharedRound;
 use round::Round;
 
 pub struct CoreLogic {
     tx_send: Sender<Packet>,
     config: SharedConfig,
-    round: Round,
+    round: SharedRound,
     blocks: SharedBlocks
 }
 
 impl CoreLogic {
-    pub fn new(conf: SharedConfig, tx_send: Sender<Packet>, blocks: SharedBlocks) -> CoreLogic {
+
+    pub fn new_shared_round() -> SharedRound {
+        Round::new_shared()
+    }
+
+    pub fn new(conf: SharedConfig, tx_send: Sender<Packet>, blocks: SharedBlocks, round: SharedRound) -> CoreLogic {
         CoreLogic {
             tx_send: tx_send,
             config: conf,
-            round: Round::new(),
+            round: round,
             blocks: blocks
         }
     }
@@ -76,7 +82,6 @@ impl CoreLogic {
     }
 
     fn test_packet_round(&self, rnd: u64, msg: &MsgType) -> bool {
-        let cur = self.round.current();
         match msg {
             // some packets are allowed from any round number:
             MsgType::RoundTableRequest => true,
@@ -92,7 +97,9 @@ impl CoreLogic {
             MsgType::BlockAlarm => true,
             MsgType::EventReport => true,
             // most of packets are allowed only from current or outrunning round:
-            _ => rnd >= cur
+            _ => {
+                rnd >= self.round.read().unwrap().current()
+            }
         }
     }
 
@@ -105,7 +112,8 @@ impl CoreLogic {
     }
 
     fn handle_round_table(&mut self, _sender: &PublicKey, rnd: u64, bytes: Option<&[u8]>) {
-        if !self.round.handle_table(rnd, bytes) {
+        let mut guard = self.round.write().unwrap();
+        if !guard.handle_table(rnd, bytes) {
             info!("failed to handle round table")
         }
     }

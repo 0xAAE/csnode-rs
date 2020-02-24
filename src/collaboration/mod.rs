@@ -11,6 +11,7 @@ use super::PublicKey;
 use super::{NODE_VERSION, UUID_TESTNET};
 use super::network::packet::{Flags, Packet};
 use super::blockchain::SharedBlocks;
+use super::core_logic::SharedRound;
 
 extern crate bincode;
 use bincode::{serialize_into, deserialize_from};
@@ -36,22 +37,22 @@ struct PeerInfo {
 pub struct Collaboration {
     tx_send: Sender<Packet>,
     sequence: u64,
-    round: u64,
     neighbours: RwLock<HashMap<PublicKey, PeerInfo>>,
     config: SharedConfig,
-    blocks: SharedBlocks
+    blocks: SharedBlocks,
+    round: SharedRound
 }
 
 impl Collaboration {
 
-    pub fn new(conf: SharedConfig, tx_send: Sender<Packet>, blocks: SharedBlocks) -> Collaboration {
+    pub fn new(conf: SharedConfig, tx_send: Sender<Packet>, blocks: SharedBlocks, round: SharedRound) -> Collaboration {
         Collaboration {
             tx_send: tx_send,
             sequence: 0,
-            round: 0,
             neighbours: RwLock::new(HashMap::<PublicKey, PeerInfo>::new()),
             config: conf,
-            blocks: blocks
+            blocks: blocks,
+            round: round
         }
     }
 
@@ -103,9 +104,13 @@ impl Collaboration {
     }
 
     fn handle_version_request(&self, sender: &PublicKey, _bytes: Option<&[u8]>) {
+        let current_round;
+        {
+            current_round = self.round.read().unwrap().current();
+        }
         // send version reply:
         let mut output: Vec<u8> = Vec::<u8>::new();
-        match pack_version_reply(&mut output, self.sequence, self.round) {
+        match pack_version_reply(&mut output, self.sequence, current_round) {
             Err(_) => {
                 error!("failed to serialize version reply");
             },
@@ -164,9 +169,13 @@ impl Collaboration {
     }
 
     fn handle_ping(&self, sender: &PublicKey, _bytes: Option<&[u8]>) {
+        let current_round;
+        {
+            current_round = self.round.read().unwrap().current();
+        }
         // send pong:
         let mut output: Vec<u8> = Vec::<u8>::new();
-        match pack_pong(&mut output, self.sequence, self.round) {
+        match pack_pong(&mut output, self.sequence, current_round) {
             Err(_) => {
                 error!("failed to serialize pong");
             },

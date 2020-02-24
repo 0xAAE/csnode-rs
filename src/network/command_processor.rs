@@ -10,6 +10,7 @@ use super::packet::Packet;
 use super::super::config::SharedConfig;
 use super::super::collaboration::Collaboration;
 use super::super::SharedBlocks;
+use super::SharedRound;
 
 pub struct CommandProcessor {
     rx_cmd: Receiver<Packet>,
@@ -18,10 +19,10 @@ pub struct CommandProcessor {
 
 impl CommandProcessor {
 
-    pub fn new(conf: SharedConfig, rx_cmd: Receiver<Packet>, tx_send: Sender<Packet>, blocks: SharedBlocks) -> CommandProcessor {
+    pub fn new(conf: SharedConfig, rx_cmd: Receiver<Packet>, tx_send: Sender<Packet>, blocks: SharedBlocks, round: SharedRound) -> CommandProcessor {
         CommandProcessor {
             rx_cmd: rx_cmd,
-            collaboration: Collaboration::new(conf, tx_send, blocks)
+            collaboration: Collaboration::new(conf, tx_send, blocks, round)
         }
     }
 

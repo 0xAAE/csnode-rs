@@ -8,7 +8,7 @@ use super::TEST_STOP_DELAY_SEC;
 use super::packet::Packet;
 // top-level modules
 use super::super::config::SharedConfig;
-use super::super::core_logic::CoreLogic;
+use super::super::core_logic::{CoreLogic, SharedRound};
 use super::SharedBlocks;
 
 pub struct MessageProcessor {
@@ -19,11 +19,11 @@ pub struct MessageProcessor {
 
 impl MessageProcessor {
 
-    pub fn new(conf: SharedConfig, rx_msg: Receiver<Packet>, tx_send:Sender<Packet>, blocks: SharedBlocks) -> MessageProcessor {
+    pub fn new(conf: SharedConfig, rx_msg: Receiver<Packet>, tx_send:Sender<Packet>, blocks: SharedBlocks, round: SharedRound) -> MessageProcessor {
         MessageProcessor {
             rx_msg: rx_msg,
             tx_send: tx_send.clone(),
-            logic: CoreLogic::new(conf, tx_send, blocks)
+            logic: CoreLogic::new(conf, tx_send, blocks, round)
         }
     }
 

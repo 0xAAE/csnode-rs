@@ -1,7 +1,9 @@
 use std::time::Instant;
+use std::sync::{Arc, RwLock};
 use log::{info};
 
 use num_format::{Locale, ToFormattedString};
+pub type SharedRound = Arc<RwLock<Round>>;
 
 pub struct Round {
     // the first round after start
@@ -27,6 +29,10 @@ impl Round {
             current_start: now,
             ave_duration: 0
         }
+    }
+
+    pub fn new_shared() -> SharedRound {
+        Arc::new(RwLock::new(Round::new()))
     }
 
     pub fn current(&self) -> u64 {
@@ -80,4 +86,5 @@ fn test_format_ms() {
     assert_eq!(mm, 33);
     assert_eq!(ss, 29);
     assert_eq!(ms, 345);
+    assert_eq!(format_ms(value), "2d 17:33:29");
 }

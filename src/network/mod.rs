@@ -28,9 +28,13 @@ use super::SharedBlocks;
 
 mod packet_collector;
 mod command_processor;
+use command_processor::CommandProcessor;
 mod message_processor;
+use message_processor::MessageProcessor;
 mod packet_sender;
 mod validator;
+
+use super::core_logic::{SharedRound, CoreLogic};
 
 pub struct Network {
 	collect_thread:		JoinHandle<()>,
@@ -73,13 +77,17 @@ impl Network {
 		parse_known_hosts_or_default(&mut known_hosts, &hosts_filename);
 		host.add_known_hosts(known_hosts);
 		host.start();
-		
+        
+        let round = CoreLogic::new_shared_round();
+        let msg_processor = MessageProcessor::new(conf.clone(), rx_msg, tx_send.clone(), blocks.clone(), round.clone());
+        let neighbourhood = CommandProcessor::new(conf.clone(), rx_cmd, tx_send, blocks, round);
+
 		let instance = Box::new(
             Network {
                 stop_flag: stop_flag_instance.clone(),
                 collect_thread: start_collect(conf.clone(), stop_flag_instance.clone(), rx_raw, tx_cmd, tx_msg),
-                neighbours_thread: start_neighbourhood(conf.clone(), stop_flag_instance.clone(), rx_cmd, tx_send.clone(), blocks.clone()),
-                processor_thread: start_msg_processor(conf.clone(), stop_flag_instance.clone(), rx_msg, tx_send, blocks),
+                neighbours_thread: start_neighbourhood(stop_flag_instance.clone(), neighbourhood),
+                processor_thread: start_msg_processor(stop_flag_instance.clone(), msg_processor),
                 sender_thread: start_sender(conf.clone(), stop_flag_instance.clone(), rx_send),
                 host: host
             });
@@ -115,11 +123,11 @@ fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>,
 	handle
 }
 
-fn start_neighbourhood(conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: Receiver<Packet>, tx_send: Sender<Packet>, blocks: SharedBlocks) -> JoinHandle<()> {
+fn start_neighbourhood(stop_flag: Arc<AtomicBool>, mut neighbourhood: CommandProcessor) -> JoinHandle<()> {
 	info!("Start neighbourhood service");
 	let handle = spawn(move || {
         info!("Neighbourhood started");
-        let mut neighbourhood = command_processor::CommandProcessor::new(conf.clone(), rx_cmd, tx_send, blocks);
+        
         let mut prev_ping = Instant::now();
         loop {
             let ping_pause = prev_ping.elapsed();
@@ -137,12 +145,10 @@ fn start_neighbourhood(conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_cmd: R
 	handle
 }
 
-fn start_msg_processor(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_msg: Receiver<Packet>,
-        tx_send: Sender<Packet>, blocks: SharedBlocks) -> JoinHandle<()> {
+fn start_msg_processor(stop_flag: Arc<AtomicBool>, mut msg_processor: MessageProcessor) -> JoinHandle<()> {
 	info!("Start message processor");
 	let handle = spawn(move || {
         info!("Message processor started");
-        let mut msg_processor = message_processor::MessageProcessor::new(_conf.clone(), rx_msg, tx_send, blocks);
         loop {
             msg_processor.recv();
             if stop_flag.load(Ordering::SeqCst) {
