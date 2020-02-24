@@ -93,15 +93,31 @@
 
 use super::raw_block::RawBlock;
 
+use rkv::{Manager, Rkv, SingleStore, Value, StoreOptions};
+
+use std::fs;
+use std::path::Path;
+
 pub struct Blocks {
-    deferred: Option<RawBlock>
+    deferred: Option<RawBlock>,
+    store: SingleStore,
+    /// the top of blockchain
+    chain_top: u64
 }
 
 impl Blocks {
 
     pub fn new() -> Blocks {
+        let path = Path::new("db/blockchain/blocks");
+        fs::create_dir_all(path).unwrap();
+        let created_arc = Manager::singleton().write().unwrap().get_or_create(path, Rkv::new).unwrap();
+        let env = created_arc.read().unwrap();
+        let store: SingleStore = env.open_single("blocks", StoreOptions::create()).unwrap();
+
         Blocks {
-            deferred: RawBlock::new(Vec::<u8>::new())
+            deferred: RawBlock::new(Vec::<u8>::new()),
+            store: store,
+            chain_top: 0
         }
     }
 

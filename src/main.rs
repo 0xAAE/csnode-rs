@@ -5,6 +5,7 @@ extern crate log;
 use log::info;
 
 extern crate blake2s_simd;
+extern crate rkv;
 
 mod primitive;
 use primitive::{PublicKey, Hash, Signature};
