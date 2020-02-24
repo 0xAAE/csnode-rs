@@ -3,6 +3,7 @@ use std::io::Write;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::mem::size_of_val;
+use std::iter::IntoIterator;
 
 use log::{debug, info, warn, error};
 
@@ -19,6 +20,10 @@ extern crate base58;
 use base58::ToBase58; // [u8].to_base58()
 
 type Command = super::network::packet::NghbrCmd;
+type Message = super::network::packet::MsgType;
+
+mod block_sync;
+use block_sync::BlockSync;
 
 #[derive(Default)]
 struct PeerInfo {
@@ -27,7 +32,7 @@ struct PeerInfo {
     /// blockchain UUID
     uuid: u64,
     /// tlast reported max stored block sequence
-    sequence: u64,
+    pub sequence: u64,
     /// the last repported consensus round
     round: u64,
     /// requires to be persistent
@@ -40,7 +45,8 @@ pub struct Collaboration {
     neighbours: RwLock<HashMap<PublicKey, PeerInfo>>,
     config: SharedConfig,
     blocks: SharedBlocks,
-    round: SharedRound
+    round: SharedRound,
+    sync: BlockSync
 }
 
 impl Collaboration {
@@ -52,7 +58,8 @@ impl Collaboration {
             neighbours: RwLock::new(HashMap::<PublicKey, PeerInfo>::new()),
             config: conf,
             blocks: blocks,
-            round: round
+            round: round,
+            sync: BlockSync::new()
         }
     }
 
@@ -96,7 +103,51 @@ impl Collaboration {
                 }
             }
         }
+        // test if block sync required
+        let current_round;
+        {
+            current_round = self.round.read().unwrap().current();
+        }
+        let blocks_top;
+        {
+            blocks_top = self.blocks.read().unwrap().top();
+        }
+        if current_round > blocks_top && current_round - blocks_top > 1 {
+            let max_allowed_request;
+            {
+                max_allowed_request = self.config.read().unwrap().sync.max_block_request as u64;
+            }
+            let begin = blocks_top + 1;
+            let end = begin + std::cmp::min(begin + max_allowed_request + 1, current_round);
+            let mut bytes = Vec::<u8>::new();
+            serialize_into(&mut bytes, &0u8).unwrap();                              // no flags
+            serialize_into(&mut bytes, &(Message::BlockRequest as u8)).unwrap();    // message
+            serialize_into(&mut bytes, &current_round).unwrap();                    // round
+            for s in begin..end {
+                serialize_into(&mut bytes, &s).unwrap();                            // requested blocks sequences
+            }
 
+            for (node_id, peer) in all.iter() {
+                if peer.sequence >= end {
+                    match Packet::new(*node_id, bytes) {
+                        None => {
+                            error!("failed create packet to request blocks");
+                        },
+                        Some(pack) => {
+                            match self.tx_send.send(pack) {
+                                Err(e) => {
+                                    warn!("failed transfer request for blocks to {}: {}", node_id.to_base58(), e);
+                                },
+                                Ok(_) => {
+                                    debug!("transfer request for blocks to {}", node_id.to_base58());
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     fn handle_error(&self, _sender: &PublicKey, _bytes: Option<&[u8]>) {

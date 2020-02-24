@@ -50,7 +50,7 @@ impl CoreLogic {
             },
             // MsgType::BlockHash,
             // MsgType::BlockRequest,
-            // MsgType::RequestedBlock,
+            MsgType::RequestedBlock => self.handle_requested_blocks(sender, bytes),
             // MsgType::FirstStage,
             // MsgType::SecondStage,
             // MsgType::ThirdStage,
@@ -120,5 +120,9 @@ impl CoreLogic {
 
     fn handle_stop_request(&self, _sender: &PublicKey, _rnd: u64, _bytes: Option<&[u8]>) {
         
+    }
+
+    fn handle_requested_blocks(&self, _sender: &PublicKey, bytes: Option<&[u8]>) {
+        info!("get requested blocks");
     }
 }

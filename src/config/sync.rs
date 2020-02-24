@@ -7,7 +7,7 @@ pub struct Data {
 	/// true: is silent mode synchro (sync up to the current round); false: normal mode      
 	fast_mode: bool, // = false;                    
 	/// max block count in one request: cannot be 0    
-	max_block_request: u8, // = 25;                 
+	pub max_block_request: u64, // = 25;                 
 	/// round count to repeat request, 0 = never  
 	request_round_delay: u8, // = 20;           
 	/// max packet count to connect to another neighbor, 0 = never

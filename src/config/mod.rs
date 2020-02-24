@@ -34,7 +34,7 @@ pub struct Config {
 	// [host_input]
 	pub host_input: endpoint::Data,
 	// [pool_sync]
-	sync: sync::Data,
+	pub sync: sync::Data,
 	// [api]
 	api: api::Data,
 	// [conveyer]

@@ -121,5 +121,7 @@ impl Blocks {
         }
     }
 
+    pub fn top(&self) -> u64 {
+        self.chain_top
+    }
 }
-
