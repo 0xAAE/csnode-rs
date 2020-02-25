@@ -3,7 +3,7 @@ use std::io::Write;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::mem::size_of_val;
-use std::iter::IntoIterator;
+use std::cmp::{max, min};
 
 use log::{debug, info, warn, error};
 
@@ -77,54 +77,60 @@ impl Collaboration {
 
     pub fn ping_all(&self) {
         // send ping packet to all neigbours
+        let mut max_block = 0;
         let all = self.neighbours.read().unwrap();
-        for item in all.keys() {
+        for (node_id, info) in all.iter() {
             let mut output: Vec<u8> = Vec::<u8>::new();
             match pack_ping(&mut output) {
                 Err(_) => {
                     error!("failed to serialize ping info");
                 },
                 Ok(_) => {
-                    match Packet::new(*item, output) {
+                    match Packet::new(*node_id, output) {
                         None => {
                             error!("failed create ping packet");
                         },
                         Some(pack) => {
                             match self.tx_send.send(pack) {
                                 Err(e) => {
-                                    warn!("failed send ping packet to {}: {}", item.to_base58(), e);
+                                    warn!("failed send ping packet to {}: {}", node_id.to_base58(), e);
                                 },
                                 Ok(_) => {
-                                    debug!("transfer ping packet to {}", item.to_base58());
+                                    debug!("transfer ping packet to {}", node_id.to_base58());
                                 }
                             }
                         }
                     }
                 }
             }
+            max_block = max(max_block, info.sequence);
         }
         // test if block sync required
-        let current_round;
+        let current_round: u64;
         {
             current_round = self.round.read().unwrap().current();
         }
+        max_block = max(max_block, current_round);
         let blocks_top;
         {
             blocks_top = self.blocks.read().unwrap().top();
         }
-        if current_round > blocks_top && current_round - blocks_top > 1 {
+        if max_block > blocks_top && max_block - blocks_top > 1 {
             let max_allowed_request;
             {
                 max_allowed_request = self.config.read().unwrap().sync.max_block_request as u64;
             }
             let begin = blocks_top + 1;
-            let end = begin + std::cmp::min(begin + max_allowed_request + 1, current_round);
+            let end = 1 + min(begin + max_allowed_request, max_block);
             let mut bytes = Vec::<u8>::new();
             serialize_into(&mut bytes, &0u8).unwrap();                              // no flags
             serialize_into(&mut bytes, &(Message::BlockRequest as u8)).unwrap();    // message
             serialize_into(&mut bytes, &current_round).unwrap();                    // round
+            // requested blocks sequences
+            let cnt = end - begin;
+            serialize_into(&mut bytes, &cnt).unwrap();
             for s in begin..end {
-                serialize_into(&mut bytes, &s).unwrap();                            // requested blocks sequences
+                serialize_into(&mut bytes, &s).unwrap();                            
             }
 
             for (node_id, peer) in all.iter() {

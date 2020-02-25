@@ -4,6 +4,7 @@ use super::super::{PublicKey};
 use std::convert::{TryInto, TryFrom};
 use std::fmt;
 use std::mem::{size_of, size_of_val};
+use log::warn;
 
 extern crate csp2p_rs;
 use csp2p_rs::{NodeId};
@@ -254,36 +255,52 @@ impl Packet {
 			pos = 10;
 		}
 		buf.extend_from_slice(&self.data[..pos]);
-		/*
-			pub unsafe extern "C" fn LZ4_decompress_safe(
-				source: *const i8, 
-				dest: *mut i8, 
-				compressedSize: i32, 
-				maxDecompressedSize: i32
-			) -> i32
-
-			return : the number of bytes decompressed into destination buffer (necessarily <= dstCapacity)
-             If destination buffer is not large enough, decoding will stop and output an error code (negative value).
-             If the source stream is detected malformed, the function will stop decoding and return a negative result.
-             This function is protected against malicious data packets
-		*/
 		let decompressed_size: u64 = deserialize_from(&self.data[pos..]).unwrap();
 		pos += std::mem::size_of_val(&decompressed_size);
-		let actually_compressed: u8 = deserialize_from(&self.data[pos..]).unwrap();
+		let compressed_size: u64 = deserialize_from(&self.data[pos..]).unwrap();
+		pos += std::mem::size_of_val(&compressed_size);
+		let is_actually_compressed: u8 = deserialize_from(&self.data[pos..]).unwrap();
 		pos += 1;
-		if actually_compressed == 1 {
+		if is_actually_compressed == 1 {
 			let zdata: &[u8] = &self.data[pos..];
 			let mut data = Vec::<u8>::with_capacity(decompressed_size as usize);
+			let res: i32;
 			unsafe {
-				let res = LZ4_decompress_safe(
+			/*
+				pub unsafe extern "C" fn LZ4_decompress_safe(
+					source: *const i8, 
+					dest: *mut i8, 
+					compressedSize: i32, 
+					maxDecompressedSize: i32
+				) -> i32
+
+				return : the number of bytes decompressed into destination buffer (necessarily <= dstCapacity)
+				If destination buffer is not large enough, decoding will stop and output an error code (negative value).
+				If the source stream is detected malformed, the function will stop decoding and return a negative result.
+				This function is protected against malicious data packets
+			*/
+				res = LZ4_decompress_safe(
 					zdata.as_ptr() as *const i8,
 					data.as_mut_ptr() as *mut i8,
 					zdata.len() as i32,
 					decompressed_size as i32);
 			}
-		}
-		else {
-
+			if res > 0 && res <= decompressed_size as i32 {
+				unsafe {
+					data.set_len(res as usize);
+				}
+				return Packet {
+					address: self.address.clone(),
+					data: data
+				};
+			}
+			else {
+				warn!("malformed compressed packet, failed to decompress");
+				return Packet {
+					address: self.address.clone(),
+					data: Vec::<u8>::new()
+				}
+			}
 		}
 		
 		Packet {

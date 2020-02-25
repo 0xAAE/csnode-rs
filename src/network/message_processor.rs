@@ -30,12 +30,16 @@ impl MessageProcessor {
     pub fn recv(&mut self) {
 		match self.rx_msg.recv_timeout(Duration::from_secs(TEST_STOP_DELAY_SEC)) {
 			Err(_) => (),
-			Ok(p) => {
+			Ok(mut p) => {
                 match p.msg_type() {
                     None => {
                         warn!("unknown message, drop");
                     },
                     Some(mt) => {
+                        if p.is_compressed() {
+                            p = p.decompress();
+                        }
+
                         match p.round() {
                             None => {
                                 warn!("malformed message, round not set, drop");

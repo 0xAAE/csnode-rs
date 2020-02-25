@@ -29,12 +29,16 @@ impl CommandProcessor {
     pub fn recv(&mut self) {
 		match self.rx_cmd.recv_timeout(Duration::from_secs(TEST_STOP_DELAY_SEC)) {
 			Err(_) => (),
-			Ok(p) => {
+			Ok(mut p) => {
                 match p.nghbr_cmd() {
                     None => {
                         warn!("unknown command, drop");
                     },
                     Some(v) => {
+                        if p.is_compressed() {
+                            p = p.decompress();
+                        }
+
                         match p.address() {
                             None => {
                                 warn!("cmd::{} has no sender, drop", v.to_string());
