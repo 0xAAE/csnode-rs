@@ -1,4 +1,5 @@
 use std::sync::mpsc::Sender;
+use std::mem::size_of;
 
 use log::{debug, info};
 use base58::ToBase58; // [u8].to_base58()
@@ -133,7 +134,7 @@ impl CoreLogic {
             }
             Some(data) => {
                 let count: u64 = deserialize_from(data).unwrap();
-                let mut input = data[8..].to_vec();
+                let mut input = data[size_of::<u64>()..].to_vec();
                 for _ in 0..count {
                     match RawBlock::new(input) {
                         None => {

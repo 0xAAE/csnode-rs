@@ -60,6 +60,7 @@ fn mock_serialize_transaction_to(bytes: &mut Vec<u8>, src_id: bool, tgt_id: bool
 #[cfg(test)]
 fn mock_serialize_raw_block_to(bytes: &mut Vec<u8>) {
     serialize_into(bytes.by_ref(), &0u8).unwrap();
+    serialize_into(bytes.by_ref(), &32u8).unwrap(); // sizeof HASH
     serialize_into(bytes.by_ref(), &[214u8; HASH_SIZE]).unwrap();
     serialize_into(bytes.by_ref(), &17_000_000u64).unwrap();
     mock_serialize_user_fields_to(bytes.by_ref());

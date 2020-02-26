@@ -10,12 +10,19 @@ pub struct RawBlock {
 impl RawBlock {
 
     pub fn new(bytes: Vec<u8>) -> Option<(RawBlock, Vec<u8>)> {
-        match validate_raw_block(&bytes[..]) {
+        if bytes.len() < size_of::<u64>() {
+            return None;
+        }
+        let block_size: u64 = deserialize_from(&bytes[..]).unwrap();
+        let block_begin = size_of::<u64>();
+        match validate_raw_block(&bytes[block_begin..]) {
             None => None,
             Some(pos) => {
-                let (block_data, next_data) = bytes.split_at(pos);
-                // block data contains u64 size of block at front
-                Some((RawBlock { data: block_data[size_of::<u64>()..].to_vec() }, next_data.to_vec()))
+                if block_size != pos as u64 {
+                    return None;
+                }
+                let (block_data, next_data) = bytes.split_at(block_begin + pos);
+                Some((RawBlock { data: block_data[block_begin..].to_vec() }, next_data.to_vec()))
             }
         }
     }
@@ -42,14 +49,12 @@ pub fn validate_raw_block(bytes: &[u8]) -> Option<usize> {
     let total = bytes.len();
 
     let mut pos =
-        size_of::<u64>() +  // size of this block
         size_of::<u8>() +   // version
         1 + HASH_SIZE +     // prev hash (1b size + 32b)
         size_of::<u64>();   // sequence
     if total <= pos {
         return None;
     }
-    let block_size: u64 = deserialize_from(&bytes[..]).unwrap();
 
     // block user fields
     match validate_user_fields(&bytes[pos..]) {
@@ -129,8 +134,6 @@ pub fn validate_raw_block(bytes: &[u8]) -> Option<usize> {
     if total < pos {
         return None;
     }
-
-    assert_eq!(pos, block_size as usize + size_of::<u64>()); // size of block in bytes included in pos
 
     Some(pos)
 }

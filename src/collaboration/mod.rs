@@ -121,7 +121,7 @@ impl Collaboration {
                 max_allowed_request = self.config.read().unwrap().sync.max_block_request as u64;
             }
             let begin = blocks_top + 1;
-            let end = 1 + min(begin + max_allowed_request, max_block);
+            let end = min(begin + max_allowed_request, max_block);
             let mut bytes = Vec::<u8>::new();
             serialize_into(&mut bytes, &0u8).unwrap();                              // no flags
             serialize_into(&mut bytes, &(Message::BlockRequest as u8)).unwrap();    // message
