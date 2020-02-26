@@ -93,14 +93,29 @@
 
 use super::raw_block::RawBlock;
 
-use rkv::{Manager, Rkv, SingleStore, Value, StoreOptions};
+extern crate rkv;
+use rkv::{Manager, Rkv, SingleStore, IntegerStore, Value, PrimitiveInt, StoreOptions, StoreError, DataError};
+use serde_derive::Serialize;
 
 use std::fs;
 use std::path::Path;
+use std::sync::{RwLock, Arc};
+use std::convert::From;
+use log::error;
+
+#[derive(Serialize)]
+struct U64(u64);
+impl PrimitiveInt for U64 {}
+impl From<u64> for U64 {
+    fn from(v: u64) -> Self {
+        U64(v)
+    }
+}
 
 pub struct Blocks {
     deferred: Option<RawBlock>,
-    store: SingleStore,
+    environ: Arc<RwLock<rkv::Rkv>>,
+    store: IntegerStore<U64>,
     /// the top of blockchain
     chain_top: u64
 }
@@ -112,10 +127,11 @@ impl Blocks {
         fs::create_dir_all(path).unwrap();
         let created_arc = Manager::singleton().write().unwrap().get_or_create(path, Rkv::new).unwrap();
         let env = created_arc.read().unwrap();
-        let store: SingleStore = env.open_single("blocks", StoreOptions::create()).unwrap();
+        let store = env.open_integer::<&str, U64>("blocks", StoreOptions::create()).unwrap();
 
         Blocks {
             deferred: None,
+            environ: created_arc.clone(),
             store: store,
             chain_top: 0
         }
@@ -123,5 +139,36 @@ impl Blocks {
 
     pub fn top(&self) -> u64 {
         self.chain_top
+    }
+
+    pub fn store(&mut self, block: RawBlock) -> bool {
+        let block_sequence = block.sequence().unwrap();
+        if block_sequence <= self.chain_top {
+            return false;
+        }
+        if block_sequence == self.chain_top + 1 {
+            let guard = self.environ.read().unwrap();
+            let mut writer = guard.write().unwrap();
+            match self.store.put(&mut writer, U64(block.sequence().unwrap()), &Value::Blob(&block.data[..])) {
+                Err(e) => {
+                    error!("failed to store block: {}", e);
+                    return false;
+                }
+                _ => {
+                    match writer.commit() {
+                        Err(e) => {
+                            error!("failed to store block: {}", e);
+                            return false;
+                        }
+                        _ => {
+                            self.chain_top = block_sequence;
+                        }
+                    }
+                }
+            }
+        }
+        // cache for further usage
+
+        true
     }
 }

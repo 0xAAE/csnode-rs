@@ -371,6 +371,8 @@ dependencies = [
  "num_enum 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rkv 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-ini 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

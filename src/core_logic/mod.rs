@@ -1,7 +1,7 @@
 use std::sync::mpsc::Sender;
 use std::mem::size_of;
 
-use log::{debug, info};
+use log::{debug, info, warn};
 use base58::ToBase58; // [u8].to_base58()
 use bincode::deserialize_from;
 
@@ -145,6 +145,10 @@ impl CoreLogic {
                             input = result.1;
                             let block = result.0;
                             info!("successfully parsed block {}", block.sequence().unwrap());
+                            let mut b = self.blocks.write().unwrap();
+                            if !b.store(block) {
+                                warn!("failed to store block to blockchain");
+                            }
                         }
                     }
                 }
