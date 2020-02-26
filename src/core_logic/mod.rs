@@ -1,6 +1,8 @@
 use std::sync::mpsc::Sender;
 
 use log::{debug, info};
+use base58::ToBase58; // [u8].to_base58()
+use bincode::deserialize_from;
 
 use super::config::SharedConfig;
 use super::PublicKey;
@@ -10,6 +12,8 @@ use super::SharedBlocks;
 mod round;
 pub use round::SharedRound;
 use round::Round;
+
+use super::blockchain::raw_block::RawBlock;
 
 pub struct CoreLogic {
     tx_send: Sender<Packet>,
@@ -122,7 +126,28 @@ impl CoreLogic {
         
     }
 
-    fn handle_requested_blocks(&self, _sender: &PublicKey, bytes: Option<&[u8]>) {
-        info!("get requested blocks");
+    fn handle_requested_blocks(&self, sender: &PublicKey, bytes: Option<&[u8]>) {
+        match bytes {
+            None => {
+                info!("get requested blocks from {}", sender.to_base58());
+            }
+            Some(data) => {
+                let count: u64 = deserialize_from(data).unwrap();
+                let mut input = data[8..].to_vec();
+                for _ in 0..count {
+                    match RawBlock::new(input) {
+                        None => {
+                            info!("failed to extract block from data");
+                            return;
+                        },
+                        Some(result) => {
+                            input = result.1;
+                            let block = result.0;
+                            info!("successfully parsed block {}", block.sequence().unwrap());
+                        }
+                    }
+                }
+            }
+        }
     }
 }

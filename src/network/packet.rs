@@ -289,9 +289,10 @@ impl Packet {
 				unsafe {
 					data.set_len(res as usize);
 				}
+				buf.append(&mut data);
 				return Packet {
 					address: self.address.clone(),
-					data: data
+					data: buf
 				};
 			}
 			else {
