@@ -9,19 +9,24 @@ pub struct RawBlock {
 
 impl RawBlock {
 
-    pub fn new(bytes: Vec<u8>) -> Option<RawBlock> {
-        if ! validate_raw_block(&bytes[..]) {
-            return None;
+    pub fn new(bytes: Vec<u8>) -> Option<(RawBlock, Vec<u8>)> {
+        match validate_raw_block(&bytes[..]) {
+            None => None,
+            Some(pos) => {
+                let (block_data, next_data) = bytes.split_at(pos);
+                Some((RawBlock { data: block_data.to_vec() }, next_data.to_vec()))
+            }
         }
-        Some(RawBlock {
-            data: bytes
-        })
     }
 
 
 }
 
-pub fn validate_raw_block(bytes: &[u8]) -> bool {
+/// validates block as serialized to byte stream starting from the begining
+/// returns:
+/// None if failed to validate
+/// Some(pos) if validation succesful, pos is the position immediately after the block
+pub fn validate_raw_block(bytes: &[u8]) -> Option<usize> {
     let total = bytes.len();
 
     let mut pos =
@@ -29,12 +34,12 @@ pub fn validate_raw_block(bytes: &[u8]) -> bool {
         HASH_SIZE +         // prev hash
         size_of::<u64>();   // sequence
     if total <= pos {
-        return false;
+        return None;
     }
     // block user fields
     match validate_user_fields(&bytes[pos..]) {
         None => {
-            return false;
+            return None;
         },
         Some(len) => {
             pos += len;
@@ -43,18 +48,18 @@ pub fn validate_raw_block(bytes: &[u8]) -> bool {
     let sizeof_money = size_of::<u32>() + size_of::<u64>();
     pos += sizeof_money;     // round cost (money)
     if total <= pos {
-        return false;
+        return None;
     }
     // transactions
     if total < pos + size_of::<u32>() {
-        return false;
+        return None;
     }
     let t_cnt: u32 = deserialize_from(&bytes[pos..]).unwrap();
     pos += size_of_val(&t_cnt);
     for _ in 0..t_cnt {
         match validate_transaction(&bytes[pos..]) {
             None => {
-                return false;
+                return None;
             },
             Some(len) => {
                 pos += len;
@@ -64,14 +69,14 @@ pub fn validate_raw_block(bytes: &[u8]) -> bool {
 
     // introduced new wallets
     if total < pos + size_of::<u32>() {
-        return false;
+        return None;
     }
     let w_cnt: u32 = deserialize_from(&bytes[pos..]).unwrap();
     pos += size_of_val(&w_cnt) + w_cnt as usize * (size_of::<u32>() + size_of::<u64>());
 
     // trusted info
     if total < pos + size_of::<u8>() + size_of::<u64>() {
-        return false;
+        return None;
     } 
 
     // trusted info - consensus
@@ -81,7 +86,7 @@ pub fn validate_raw_block(bytes: &[u8]) -> bool {
     pos += size_of_val(&consensus_cnt) + size_of_val(&consensus_bits) + (consensus_cnt as usize * PUBLIC_KEY_SIZE);
     // trusted info - next RT
     if total < pos + size_of::<u8>() + size_of::<u64>() {
-        return false;
+        return None;
     }
     let rt_cnt: u8 = deserialize_from(&bytes[pos..]).unwrap();
     let rt_bits: u64 = deserialize_from(&bytes[pos + size_of_val(&rt_cnt)..]).unwrap();
@@ -93,24 +98,30 @@ pub fn validate_raw_block(bytes: &[u8]) -> bool {
     pos += sig_blk_cnt * SIGNATURE_SIZE;
     // contract signatures
     if total < pos + 1 {
-        return false;
+        return None;
     }
     let contr_cnt: u8 = deserialize_from(&bytes[pos..]).unwrap();
     pos += size_of_val(&contr_cnt);
     for _ in 0..contr_cnt {
         pos += PUBLIC_KEY_SIZE + size_of::<u64>();
         if total < pos {
-            return false;
+            return None;
         }
         let item_sig_cnt: u8 = deserialize_from(&bytes[pos..]).unwrap();
         pos += size_of_val(&item_sig_cnt) + (size_of::<u8>() + SIGNATURE_SIZE) * item_sig_cnt as usize;
     }
 
-    total == pos
+    if total < pos {
+        return None;
+    }
+
+    Some(pos)
 }
 
-/// None - failed to validate
-/// Some(pos) - the position immediately after user fields, which starts from 1, pos[0] is fileds count
+/// validates set of user fields as serialized to byte stream starting from the begining; suppose the [0] byte is user fields count in stream
+/// returns:
+/// None if failed to validate
+/// Some(pos) if validation succesful, pos is the position immediately after the block
 pub fn validate_user_fields(bytes: &[u8]) -> Option<usize> {
     let total = bytes.len();
     if total <= 0 {
@@ -153,8 +164,10 @@ pub fn validate_user_fields(bytes: &[u8]) -> Option<usize> {
     Some(pos)
 }
 
-/// None - failed to validate
-/// Some(pos) - th eposition immediately after transaction
+/// validates transaction as serialized to byte stream starting from the begining
+/// returns:
+/// None if failed to validate
+/// Some(pos) if validation succesful, pos is the position immediately after the transaction
 pub fn validate_transaction(bytes: &[u8]) -> Option<usize> {
     let total = bytes.len();
     if total <= 6 {

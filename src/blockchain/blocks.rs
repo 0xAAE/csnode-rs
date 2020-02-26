@@ -115,7 +115,7 @@ impl Blocks {
         let store: SingleStore = env.open_single("blocks", StoreOptions::create()).unwrap();
 
         Blocks {
-            deferred: RawBlock::new(Vec::<u8>::new()),
+            deferred: None,
             store: store,
             chain_top: 0
         }

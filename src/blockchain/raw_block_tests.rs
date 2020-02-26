@@ -192,7 +192,7 @@ fn test_validate_raw_block() {
     let mut bytes = Vec::<u8>::new();
     mock_serialize_raw_block_to(bytes.by_ref());
 
-    assert_eq!(validate_raw_block(&bytes[..]), true);
-    assert_eq!(validate_raw_block(&bytes[1..]), false);
-    assert_eq!(validate_raw_block(&bytes[..bytes.len() - 1]), false);
+    assert_eq!(validate_raw_block(&bytes[..]), Some(bytes.len()));
+    assert_eq!(validate_raw_block(&bytes[1..]), None);
+    assert_eq!(validate_raw_block(&bytes[..bytes.len() - 1]), None);
 }
