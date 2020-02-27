@@ -94,30 +94,21 @@
 use super::raw_block::RawBlock;
 
 extern crate rkv;
-use rkv::{Manager, Rkv, SingleStore, IntegerStore, Value, PrimitiveInt, StoreOptions, EnvironmentBuilder, DatabaseFlags, EnvironmentFlags, StoreError, DataError};
+use rkv::{Manager, Rkv, SingleStore, Value, PrimitiveInt, StoreOptions, EnvironmentBuilder, DatabaseFlags, EnvironmentFlags, StoreError, DataError};
 use serde_derive::Serialize;
 
 use std::fs;
 use std::path::Path;
 use std::sync::{RwLock, Arc};
-use std::convert::From;
+use std::convert::{From, AsRef};
 use log::{info, error};
-
-#[derive(Serialize)]
-struct U64(u64);
-impl PrimitiveInt for U64 {}
-impl From<u64> for U64 {
-    fn from(v: u64) -> Self {
-        U64(v)
-    }
-}
 
 static START_BLOCKCHAIN_SIZE: usize = 1 * 1024 * 1024 * 1024; // 1G
 static INCREASE_BLOCKCHAIN_SIZE: usize = 500 * 1024 * 1024; // 500M
 
 pub struct Blocks {
     environment: Arc<RwLock<rkv::Rkv>>,
-    db: IntegerStore<U64>,
+    db: SingleStore,
     /// the top of blockchain
     chain_top: u64
 }
@@ -134,7 +125,7 @@ impl Blocks {
             set_max_dbs(2);
         let created_arc = Manager::singleton().write().unwrap().get_or_create(path, |path| { Rkv::from_env(path, builder) }).unwrap();
         let environment = created_arc.read().unwrap();
-        let store = environment.open_integer::<&str, U64>("blocks", StoreOptions::create()).unwrap();
+        let store = environment.open_single("blocks", StoreOptions::create()).unwrap();
 
         Blocks {
             environment: created_arc.clone(),
@@ -159,7 +150,7 @@ impl Blocks {
             }
             let guard = self.environment.read().unwrap();
             let mut writer = guard.write().unwrap();
-            match self.db.put(&mut writer, U64(block.sequence().unwrap()), &Value::Blob(&block.data[..])) {
+            match self.db.put(&mut writer, &block, &Value::Blob(&block.data[..])) {
                 Err(e) => {
                     error!("failed to store block: {}", e);
                     return false;
@@ -194,7 +185,7 @@ impl Blocks {
                 let last_pgno = info.last_pgno();
                 match guard.stat() {
                     Err(e) => {
-                        error!("failed to get free space: " {});
+                        error!("failed to get free space: {}", e);
                         return false;
                     }
                     Ok(stat) => {

@@ -1,4 +1,6 @@
 use std::mem::{size_of_val, size_of};
+use std::convert::AsRef;
+
 use super::super::primitive::{HASH_SIZE, PUBLIC_KEY_SIZE, SIGNATURE_SIZE};
 
 use bincode::deserialize_from;
@@ -6,6 +8,10 @@ use bincode::deserialize_from;
 pub struct RawBlock {
     pub data: Vec<u8>
 }
+
+static OFFSET_SEQUENCE: usize =
+    size_of::<u8>() + // blcok version
+    1 + HASH_SIZE; // prev hash (1b size + 32b)
 
 impl RawBlock {
 
@@ -40,6 +46,16 @@ impl RawBlock {
     
 }
 
+impl AsRef<[u8]> for RawBlock {
+
+    fn as_ref(&self) -> &[u8] {
+        if self.data.len() >= OFFSET_SEQUENCE + size_of::<u64>() {
+            return &self.data[OFFSET_SEQUENCE..OFFSET_SEQUENCE + size_of::<u64>()];
+        }
+        // empty slice only :-(
+        return &self.data[..]
+    }
+}
 
 /// validates block as serialized to byte stream starting from the begining
 /// returns:
