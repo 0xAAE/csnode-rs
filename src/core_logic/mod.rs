@@ -135,7 +135,10 @@ impl CoreLogic {
             Some(data) => {
                 let count: u64 = deserialize_from(data).unwrap();
                 let mut input = data[size_of::<u64>()..].to_vec();
-                for _ in 0..count {
+                let mut first = 0u64;
+                let mut last = 0u64;
+                let mut failed = Vec::<u64>::new();
+                for i in 0..count {
                     match RawBlock::new(input) {
                         None => {
                             info!("failed to extract block from data");
@@ -144,12 +147,29 @@ impl CoreLogic {
                         Some(result) => {
                             input = result.1;
                             let block = result.0;
-                            info!("got requested block {}, store", block.sequence().unwrap());
+                            let seq = block.sequence().unwrap();
+                            if i == 0 {
+                                first = seq;
+                            }
+                            else if i + 1 == count {
+                                last = seq;
+                            }
                             let mut b = self.blocks.write().unwrap();
                             if !b.store(block) {
-                                warn!("failed to store block to blockchain");
+                                failed.push(seq);
+                                warn!("failed to store block {} to blockchain", seq);
+
                             }
                         }
+                    }
+                }
+                let cnt_ok = 1 + last - first - failed.len() as u64;
+                if last > 0 {
+                    if failed.is_empty() {
+                        info!("stored {} blocks form {}..{}", cnt_ok, first, last);
+                    }
+                    else {
+                        warn!("only {} blocks from {}..{} stred, {} failed", cnt_ok, first, last, failed.len());
                     }
                 }
             }

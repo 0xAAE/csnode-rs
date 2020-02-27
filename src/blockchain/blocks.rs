@@ -209,4 +209,8 @@ impl Blocks {
 
         true
     }
+
+    fn last_sequence() -> u64 {
+        0
+    }
 }
