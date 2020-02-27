@@ -94,13 +94,12 @@
 use super::raw_block::RawBlock;
 
 extern crate rkv;
-use rkv::{Manager, Rkv, SingleStore, Value, PrimitiveInt, StoreOptions, EnvironmentBuilder, DatabaseFlags, EnvironmentFlags, StoreError, DataError};
-use serde_derive::Serialize;
+use rkv::{Manager, Rkv, SingleStore, Value, StoreOptions, EnvironmentBuilder, EnvironmentFlags, StoreError};
+use bincode::deserialize_from;
 
 use std::fs;
 use std::path::Path;
 use std::sync::{RwLock, Arc};
-use std::convert::{From, AsRef};
 use log::{info, error};
 
 static START_BLOCKCHAIN_SIZE: usize = 1 * 1024 * 1024 * 1024; // 1G
@@ -127,11 +126,15 @@ impl Blocks {
         let environment = created_arc.read().unwrap();
         let store = environment.open_single("blocks", StoreOptions::create()).unwrap();
 
-        Blocks {
+        let mut instance = Blocks {
             environment: created_arc.clone(),
             db: store,
             chain_top: 0
-        }
+        };
+
+        instance.chain_top = instance.last_sequence();
+
+        instance
     }
 
     pub fn top(&self) -> u64 {
@@ -210,7 +213,27 @@ impl Blocks {
         true
     }
 
-    fn last_sequence() -> u64 {
+    fn last_sequence(&self) -> u64 {
+        let guard = self.environment.read().unwrap();
+        let reader = guard.read().unwrap();
+        match self.db.iter_start(&reader) {
+            Err(_) => (),
+            Ok(it) => {
+                match it.last() {
+                    None => (),
+                    Some(res) => {
+                        match res {
+                            Err(_) => (),
+                            Ok((k, _)) => {
+                                let seq: u64 = deserialize_from(k).unwrap();
+                                return seq;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         0
     }
 }
