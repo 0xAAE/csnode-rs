@@ -144,7 +144,7 @@ impl CoreLogic {
                         Some(result) => {
                             input = result.1;
                             let block = result.0;
-                            info!("successfully parsed block {}", block.sequence().unwrap());
+                            info!("got requested block {}, store", block.sequence().unwrap());
                             let mut b = self.blocks.write().unwrap();
                             if !b.store(block) {
                                 warn!("failed to store block to blockchain");

@@ -94,7 +94,7 @@
 use super::raw_block::RawBlock;
 
 extern crate rkv;
-use rkv::{Manager, Rkv, SingleStore, IntegerStore, Value, PrimitiveInt, StoreOptions, StoreError, DataError};
+use rkv::{Manager, Rkv, SingleStore, IntegerStore, Value, PrimitiveInt, StoreOptions, DatabaseFlags, EnvironmentFlags, StoreError, DataError};
 use serde_derive::Serialize;
 
 use std::fs;
@@ -112,6 +112,8 @@ impl From<u64> for U64 {
     }
 }
 
+static START_BLOCKCHAIN_SIZE: usize = 1 * 1024 * 1024 * 1024;
+
 pub struct Blocks {
     deferred: Option<RawBlock>,
     environ: Arc<RwLock<rkv::Rkv>>,
@@ -125,7 +127,15 @@ impl Blocks {
     pub fn new() -> Blocks {
         let path = Path::new("db/blockchain/blocks");
         fs::create_dir_all(path).unwrap();
-        let created_arc = Manager::singleton().write().unwrap().get_or_create(path, Rkv::new).unwrap();
+        let mut environment = 
+            Rkv::environment_builder().
+            set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::WRITE_MAP | EnvironmentFlags::MAP_ASYNC).
+            set_map_size(START_BLOCKCHAIN_SIZE).
+            set_max_dbs(2).
+            open(path);
+        let created_arc = Manager::singleton().write().unwrap().get_or_create(path,
+             Rkv::from::
+        ).unwrap();
         let env = created_arc.read().unwrap();
         let store = env.open_integer::<&str, U64>("blocks", StoreOptions::create()).unwrap();
 
