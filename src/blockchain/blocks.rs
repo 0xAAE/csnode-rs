@@ -95,21 +95,30 @@ use super::raw_block::RawBlock;
 
 extern crate rkv;
 use rkv::{Manager, Rkv, SingleStore, Value, StoreOptions, EnvironmentBuilder, EnvironmentFlags, StoreError};
-use bincode::deserialize_from;
+use bincode::{deserialize_from, serialize_into};
 
 use std::fs;
 use std::path::Path;
 use std::sync::{RwLock, Arc};
+use std::mem::{size_of_val, size_of};
+use std::io::Write;
 use log::{info, error};
 
 static START_BLOCKCHAIN_SIZE: usize = 1 * 1024 * 1024 * 1024; // 1G
 static INCREASE_BLOCKCHAIN_SIZE: usize = 500 * 1024 * 1024; // 500M
+static START_BLOCKCACHE_SIZE: usize = 10 * 1024 * 1024; // 10M
+static INCREASE_BLOCKCACHE_SIZE: usize = 5 * 1024 * 1024; // 5M
 
 pub struct Blocks {
     environment: Arc<RwLock<rkv::Rkv>>,
+    // blockchain storage
     db: SingleStore,
-    /// the top of blockchain
-    chain_top: u64
+    // current last block in chain
+    chain_top: u64,
+    // cached for future blocks storage
+    cache: SingleStore,
+    // current start block in cache
+    cache_front: u64
 }
 
 impl Blocks {
@@ -121,18 +130,21 @@ impl Blocks {
         builder.
             set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::WRITE_MAP | EnvironmentFlags::MAP_ASYNC).
             set_map_size(START_BLOCKCHAIN_SIZE).
-            set_max_dbs(2);
+            set_max_dbs(2); // chain & cache
         let created_arc = Manager::singleton().write().unwrap().get_or_create(path, |path| { Rkv::from_env(path, builder) }).unwrap();
         let environment = created_arc.read().unwrap();
-        let store = environment.open_single("blocks", StoreOptions::create()).unwrap();
-
+        let db_store = environment.open_single("blocks", StoreOptions::create()).unwrap();
+        let cache_store = environment.open_single("cache", StoreOptions::create()).unwrap();
         let mut instance = Blocks {
             environment: created_arc.clone(),
-            db: store,
-            chain_top: 0
+            db: db_store,
+            chain_top: 0,
+            cache: cache_store,
+            cache_front: u64::max_value()
         };
 
         instance.chain_top = instance.last_sequence();
+        instance.cache_front = instance.first_cached();
 
         instance
     }
@@ -143,35 +155,68 @@ impl Blocks {
 
     pub fn store(&mut self, block: RawBlock) -> bool {
         let block_sequence = block.sequence().unwrap();
-        if block_sequence <= self.chain_top {
+        if self.contains(block_sequence) {
             return false;
         }
+
         if block_sequence == self.chain_top + 1 {
+            // chain block
             if !self.check_map_size() {
                 error!("failed to store block {}", block_sequence);
                 return false;
             }
-            let guard = self.environment.read().unwrap();
-            let mut writer = guard.write().unwrap();
-            match self.db.put(&mut writer, &block, &Value::Blob(&block.data[..])) {
-                Err(e) => {
-                    error!("failed to store block: {}", e);
-                    return false;
-                }
-                _ => {
-                    match writer.commit() {
-                        Err(e) => {
-                            error!("failed to store block: {}", e);
-                            return false;
+            {
+                let guard = self.environment.read().unwrap();
+                let mut writer = guard.write().unwrap();
+                match self.db.put(&mut writer, &block, &Value::Blob(&block.data[..])) {
+                    Err(e) => {
+                        error!("failed to chain block: {}", e);
+                        return false;
+                    }
+                    _ => {
+                        match writer.commit() {
+                            Err(e) => {
+                                error!("failed to chain block: {}", e);
+                                return false;
+                            }
+                            _ => {
+                                self.chain_top = block_sequence;
+                            }
                         }
-                        _ => {
-                            self.chain_top = block_sequence;
+                    }
+                }
+            }
+            // 
+            self.test_cached_blocks();
+            return true;
+        }
+
+        // cache for further usage
+        if !self.check_map_size() {
+            error!("failed to cache block {}", block_sequence);
+            return false;
+        }
+        let guard = self.environment.read().unwrap();
+        let mut writer = guard.write().unwrap();
+        match self.cache.put(&mut writer, &block, &Value::Blob(&block.data[..])) {
+            Err(e) => {
+                error!("failed to cache block: {}", e);
+                return false;
+            }
+            _ => {
+                match writer.commit() {
+                    Err(e) => {
+                        error!("failed to cache block: {}", e);
+                        return false;
+                    }
+                    _ => {
+                        if block_sequence < self.cache_front {
+                            self.cache_front = block_sequence;
                         }
                     }
                 }
             }
         }
-        // cache for further usage
 
         true
     }
@@ -236,4 +281,90 @@ impl Blocks {
 
         0
     }
+
+    fn first_cached(&self) -> u64 {
+        let guard = self.environment.read().unwrap();
+        let reader = guard.read().unwrap();
+        match self.cache.iter_start(&reader) {
+            Err(_) => (),
+            Ok(mut it) => {
+                match it.next() {
+                    None => (),
+                    Some(res) => {
+                        match res {
+                            Err(_) => (),
+                            Ok((k, _)) => {
+                                let seq: u64 = deserialize_from(k).unwrap();
+                                return seq;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        u64::max_value()
+    }
+
+    fn contains(&self, sequence: u64) -> bool {
+        if sequence <= self.chain_top {
+            return true;
+        }
+        if sequence < self.cache_front {
+            return false;
+        }
+        if sequence == self.cache_front {
+            return true;
+        }
+
+        // lookup through cache
+        let mut key = [0u8; size_of::<u64>()];
+        serialize_into(&mut key[..], &sequence).unwrap();
+        let guard = self.environment.read().unwrap();
+        let reader = guard.read().unwrap();
+        match self.cache.get(&reader, &key) {
+            Err(_) => false,
+            Ok(None) => false,
+            Ok(_) => true
+        }
+    }
+
+    fn test_cached_blocks(&mut self) {
+        let ready_to_chain = Vec::<RawBlock>::new();
+        if self.chain_top + 1 == self.cache_front {
+            let mut i = self.cache_front;
+            loop {
+                if self.contains(i) {
+                    // todo load block from cache
+                    // todo push block to ready_to_chain
+                    i += 1;
+                }
+                else {
+                    break;
+                }
+            }
+            if !ready_to_chain.is_empty() {
+                // todo remove all chained blocks from cache
+                self.cache_front = self.first_cached(); 
+
+                // chain all blocks from ready_to_chain
+                for block in ready_to_chain {
+                    // store() is not dangerous, it will subsequently call to test_cahced_blocks() wich immediately return 
+                    // due to cache has already cleared from all theese blocks and at most one block behind
+                    self.store(block);
+                }
+            }
+        }
+    }
+
+    fn remove_from_cache(&mut self, block: RawBlock) {
+        let block_sequence = block.sequence().unwrap();
+        if block_sequence <= self.cache_front {
+            return;
+        }
+
+        // todo try remove block
+
+    }
+
 }
