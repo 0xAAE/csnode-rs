@@ -139,7 +139,7 @@ impl CoreLogic {
                 let mut last = 0u64;
                 let mut failed = Vec::<u64>::new();
                 for i in 0..count {
-                    match RawBlock::new(input) {
+                    match RawBlock::new_from_stream(input) {
                         None => {
                             info!("failed to extract block from data");
                             return;

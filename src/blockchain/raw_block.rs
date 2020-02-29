@@ -15,7 +15,8 @@ static OFFSET_SEQUENCE: usize =
 
 impl RawBlock {
 
-    pub fn new(bytes: Vec<u8>) -> Option<(RawBlock, Vec<u8>)> {
+    // use case: extract chain of blocks from input stream
+    pub fn new_from_stream(bytes: Vec<u8>) -> Option<(RawBlock, Vec<u8>)> {
         if bytes.len() < size_of::<u64>() {
             return None;
         }
@@ -29,6 +30,22 @@ impl RawBlock {
                 }
                 let (block_data, next_data) = bytes.split_at(block_begin + pos);
                 Some((RawBlock { data: block_data[block_begin..].to_vec() }, next_data.to_vec()))
+            }
+        }
+    }
+
+    // use case: construct block from its binary represantation 
+    pub fn new_from_bytes(bytes: &[u8]) -> Option<RawBlock> {
+        if bytes.len() < size_of::<u64>() {
+            return None;
+        }
+        match validate_raw_block(bytes) {
+            None => None,
+            Some(pos) => {
+                if pos != bytes.len() {
+                    return None;
+                }
+                Some(RawBlock { data: bytes.to_vec() })
             }
         }
     }

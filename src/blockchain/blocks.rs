@@ -186,7 +186,7 @@ impl Blocks {
                     }
                 }
             }
-            // 
+            // test if next cached block is
             self.test_cached_blocks();
             return true;
         }
@@ -330,41 +330,81 @@ impl Blocks {
     }
 
     fn test_cached_blocks(&mut self) {
-        let ready_to_chain = Vec::<RawBlock>::new();
-        if self.chain_top + 1 == self.cache_front {
-            let mut i = self.cache_front;
-            loop {
-                if self.contains(i) {
-                    // todo load block from cache
-                    // todo push block to ready_to_chain
-                    i += 1;
-                }
-                else {
+        let mut ready_to_chain = Vec::<RawBlock>::new();
+        let mut next_req = self.chain_top + 1; 
+        while next_req == self.cache_front {
+            // pop_from_cach implicitly moves cache_front to next value:
+            match self.pop_from_cache() {
+                None => {
+                    error!("panic! failed pop next block {}", next_req);
                     break;
+                },
+                Some(block) => {
+                    ready_to_chain.push(block);
+                    next_req += 1;
                 }
             }
-            if !ready_to_chain.is_empty() {
-                // todo remove all chained blocks from cache
-                self.cache_front = self.first_cached(); 
-
-                // chain all blocks from ready_to_chain
-                for block in ready_to_chain {
-                    // store() is not dangerous, it will subsequently call to test_cahced_blocks() wich immediately return 
-                    // due to cache has already cleared from all theese blocks and at most one block behind
-                    self.store(block);
-                }
+        }
+        if !ready_to_chain.is_empty() {
+            // chain all blocks from ready_to_chain
+            for block in ready_to_chain {
+                // store() is not dangerous, it will subsequently call to test_cahced_blocks() wich immediately return 
+                // due to cache has already cleared from all theese blocks and at most one block behind
+                self.store(block);
+                // todo log info
             }
         }
     }
 
-    fn remove_from_cache(&mut self, block: RawBlock) {
-        let block_sequence = block.sequence().unwrap();
-        if block_sequence <= self.cache_front {
-            return;
+    // remove first cached block from cache and return it
+    fn pop_from_cache(&mut self) -> Option<RawBlock> {
+        let guard = self.environment.read().unwrap();
+        let reader = guard.read().unwrap();
+        match self.cache.iter_start(&reader) {
+            Err(_) => (),
+            Ok(mut it) => {
+                match it.next() {
+                    None => (),
+                    Some(res) => {
+                        match res {
+                            Err(_) => (),
+                            Ok((_, v)) => {
+                                match v {
+                                    None => (),
+                                    Some(value) => {
+                                        match value {
+                                            Value::Blob(bytes) => {
+                                                let ret = RawBlock::new_from_bytes(bytes);
+                                                // re-assign cache_front
+                                                match it.next() {
+                                                    None => {
+                                                        self.cache_front = u64::max_value();
+                                                    },
+                                                    Some(res) => {
+                                                        match res {
+                                                            Err(_) => {
+                                                                self.cache_front = u64::max_value();
+                                                            }
+                                                            Ok((k, _)) => {
+                                                                self.cache_front = deserialize_from(k).unwrap();
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                return ret;       
+                                            },
+                                            _ => ()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        // todo try remove block
-
+        None
     }
 
 }
