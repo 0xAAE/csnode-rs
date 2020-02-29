@@ -89,18 +89,18 @@ impl CoreLogic {
     fn test_packet_round(&self, rnd: u64, msg: &MsgType) -> bool {
         match msg {
             // some packets are allowed from any round number:
-            MsgType::RoundTableRequest => true,
-            MsgType::RoundTableReply => true,
-            MsgType::TransactionPacket => true,
-            MsgType::TransactionsPacketReply => true,
-            MsgType::TransactionsPacketRequest => true,
-            MsgType::BlockRequest => true,
-            MsgType::RequestedBlock => true,
-            MsgType::StateRequest => true,
-            MsgType::StateReply => true,
-            MsgType::EmptyRoundPack => true,
-            MsgType::BlockAlarm => true,
-            MsgType::EventReport => true,
+            MsgType::RoundTableRequest
+            | MsgType::RoundTableReply
+            | MsgType::TransactionPacket
+            | MsgType::TransactionsPacketReply
+            | MsgType::TransactionsPacketRequest
+            | MsgType::BlockRequest
+            | MsgType::RequestedBlock
+            | MsgType::StateRequest
+            | MsgType::StateReply
+            | MsgType::EmptyRoundPack
+            | MsgType::BlockAlarm
+            | MsgType::EventReport => true,
             // most of packets are allowed only from current or outrunning round:
             _ => {
                 rnd >= self.round.read().unwrap().current()
