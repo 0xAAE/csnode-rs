@@ -7,3 +7,4 @@ debug.log
 config.ini
 banlist.dat
 db/*
+p2p_db/*
