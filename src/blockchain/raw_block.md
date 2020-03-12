@@ -82,9 +82,9 @@
     
 - contract signatures:
     >- count_contract_sig: **u8**
-    >>- contract_sig_data
+    >> contract_sig_data
     >>  - key: **[u8; 32]**
     >>  - round: **u64**
-    >>> - trusted_cnt: **u8**
-    >>>    - trusted_idx: **u8**
-    >>>    - trusted_sig: **[u8; 64]**
+    >>  - trusted_cnt: **u8**
+    >>> - trusted_idx: **u8**
+    >>> - trusted_sig: **[u8; 64]**
