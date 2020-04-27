@@ -161,10 +161,9 @@ impl Collaboration {
     }
 
     fn handle_version_request(&self, sender: &PublicKey, _bytes: Option<&[u8]>) {
-        let current_round;
-        {
-            current_round = self.round.read().unwrap().current();
-        }
+        let current_round = {
+            self.round.read().unwrap().current()
+        };
         // send version reply:
         let mut output: Vec<u8> = Vec::<u8>::new();
         match pack_version_reply(&mut output, self.sequence, current_round) {
@@ -226,10 +225,9 @@ impl Collaboration {
     }
 
     fn handle_ping(&self, sender: &PublicKey, _bytes: Option<&[u8]>) {
-        let current_round;
-        {
-            current_round = self.round.read().unwrap().current();
-        }
+        let current_round = {
+            self.round.read().unwrap().current()
+        };
         // send pong:
         let mut output: Vec<u8> = Vec::<u8>::new();
         match pack_pong(&mut output, self.sequence, current_round) {
