@@ -5,7 +5,7 @@ use log::{debug, warn};
 
 // network submodules
 use super::TEST_STOP_DELAY_SEC;
-use super::packet::Packet;
+use super::packet::{Packet, MsgType};
 // top-level modules
 use super::super::config::SharedConfig;
 use super::super::core_logic::{CoreLogic, SharedRound};
@@ -36,8 +36,15 @@ impl MessageProcessor {
                         warn!("unknown message, drop");
                     },
                     Some(mt) => {
-                        if p.is_compressed() {
-                            p = p.decompress();
+                        match mt {
+                            // actually only particular packets use compression despite of
+                            // Flags::Compressed value
+                            MsgType::RequestedBlock => {
+                                if p.is_compressed() {
+                                    p = p.decompress();
+                                }        
+                            },
+                            _ => ()
                         }
 
                         match p.round() {

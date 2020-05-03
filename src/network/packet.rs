@@ -240,18 +240,6 @@ impl Packet {
 	}
 
 	pub fn decompress(&self) -> Packet {
-		// workaround for the fact that only RequestedBlock is actually compressed as well others are not
-		// whatever is set in FLAGS
-		if !self.is_message() || self.msg_type().unwrap_or(MsgType::NodeStopRequest) != MsgType::RequestedBlock {
-			// handle as packet is not compressed			
-			return Packet {
-				address: self.address.clone(),
-				data: self.data.clone()
-			};
-		}
-
-		// general handling of CORRECTLY set "Compressed" flag
-
 		if !self.is_compressed() {
 			return Packet {
 				address: self.address.clone(),
