@@ -50,7 +50,7 @@ fn test_bitflags() {
 
 // copy of c++ enum
 #[repr(u8)]
-#[derive(Debug, TryFromPrimitive)]
+#[derive(Debug, TryFromPrimitive, PartialEq)]
 pub enum MsgType {
     BootstrapTable,
     Transactions,
@@ -240,12 +240,25 @@ impl Packet {
 	}
 
 	pub fn decompress(&self) -> Packet {
+		// workaround for the fact that only RequestedBlock is actually compressed as well others are not
+		// whatever is set in FLAGS
+		if !self.is_message() || self.msg_type().unwrap_or(MsgType::NodeStopRequest) != MsgType::RequestedBlock {
+			// handle as packet is not compressed			
+			return Packet {
+				address: self.address.clone(),
+				data: self.data.clone()
+			};
+		}
+
+		// general handling of CORRECTLY set "Compressed" flag
+
 		if !self.is_compressed() {
 			return Packet {
 				address: self.address.clone(),
 				data: self.data.clone()
 			};
 		}
+
 		let mut buf = Vec::<u8>::new();
 		let mut pos: usize;
 		if self.is_neigbour() {
