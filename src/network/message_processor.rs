@@ -7,9 +7,9 @@ use log::{debug, warn};
 use super::TEST_STOP_DELAY_SEC;
 use super::packet::{Packet, MsgType};
 // top-level modules
-use super::super::config::SharedConfig;
-use super::super::core_logic::{CoreLogic, SharedRound};
-use super::SharedBlocks;
+use crate::config::SharedConfig;
+use crate::core_logic::{CoreLogic, SharedRound};
+use crate::blockchain::SharedBlocks;
 
 pub struct MessageProcessor {
     rx_msg: Receiver<Packet>,

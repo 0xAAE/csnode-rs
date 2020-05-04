@@ -5,16 +5,16 @@ use log::{debug, info, warn};
 use base58::ToBase58; // [u8].to_base58()
 use bincode::deserialize_from;
 
-use super::config::SharedConfig;
-use super::PublicKey;
-use super::network::packet::{Packet, MsgType};
-use super::SharedBlocks;
+use crate::config::SharedConfig;
+use crate::PublicKey;
+use crate::network::packet::{Packet, MsgType};
+use crate::SharedBlocks;
 
 mod round;
 pub use round::SharedRound;
 use round::Round;
 
-use super::blockchain::raw_block::RawBlock;
+use crate::blockchain::raw_block::RawBlock;
 
 pub struct CoreLogic {
     tx_send: Sender<Packet>,

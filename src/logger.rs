@@ -7,7 +7,7 @@ use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWin
 use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
 use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
 
-use super::config::SharedConfig;
+use crate::config::SharedConfig;
 
 pub fn init(conf: SharedConfig) {
 	let data_guard = conf.read().unwrap();

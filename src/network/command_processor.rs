@@ -7,10 +7,10 @@ use log::{debug, warn};
 use super::TEST_STOP_DELAY_SEC;
 use super::packet::Packet;
 // top-level modules
-use super::super::config::SharedConfig;
-use super::super::collaboration::Collaboration;
-use super::super::SharedBlocks;
-use super::SharedRound;
+use crate::config::SharedConfig;
+use crate::collaboration::Collaboration;
+use crate::blockchain::SharedBlocks;
+use crate::core_logic::SharedRound;
 
 pub struct CommandProcessor {
     rx_cmd: Receiver<Packet>,

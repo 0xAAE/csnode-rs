@@ -1,4 +1,3 @@
-use super::config::SharedConfig;
 use std::thread::{JoinHandle, spawn};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -11,6 +10,10 @@ use std::str::FromStr;
 use std::time::Instant;
 use log::info;
 
+use crate::config::SharedConfig;
+use crate::blockchain::SharedBlocks;
+use crate::core_logic::CoreLogic; //{SharedRound, CoreLogic};
+
 use base58::FromBase58;
 
 use csp2p_rs::{CSHost, NodeInfo, NodeId, RawPacket};
@@ -22,7 +25,6 @@ const MAX_CMD_QUEUE: usize = 1024;
 
 pub mod packet;
 use packet::Packet;
-use super::SharedBlocks;
 
 mod packet_collector;
 mod command_processor;
@@ -31,8 +33,6 @@ mod message_processor;
 use message_processor::MessageProcessor;
 mod packet_sender;
 mod validator;
-
-use super::core_logic::{SharedRound, CoreLogic};
 
 pub struct Network {
 	collect_thread:		JoinHandle<()>,

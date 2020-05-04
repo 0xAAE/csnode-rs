@@ -1,7 +1,7 @@
 #[cfg(test)]
 use super::raw_block::{validate_user_fields, validate_transaction, validate_raw_block};
 #[cfg(test)]
-use super::super::primitive::{HASH_SIZE, PUBLIC_KEY_SIZE, SIGNATURE_SIZE};
+use crate::primitive::{HASH_SIZE, PUBLIC_KEY_SIZE, SIGNATURE_SIZE};
 #[cfg(test)]
 use bincode::serialize_into;
 #[cfg(test)]

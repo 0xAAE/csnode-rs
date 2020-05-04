@@ -1,16 +1,14 @@
-use super::super::{PublicKey};
-//use super::super::bitflags;
-//use super::super::blake2s_simd::Hash;
 use std::convert::{TryInto, TryFrom};
 use std::fmt;
-//use std::mem::{size_of, size_of_val};
 use log::warn;
 
-use csp2p_rs::{NodeId};
+use csp2p_rs::NodeId;
 use num_enum::TryFromPrimitive;
 use lz4::liblz4::LZ4_decompress_safe;
 use bincode::deserialize_from;
 use bitflags::bitflags;
+
+use crate::{PublicKey};
 
 bitflags! {
 	pub struct Flags: u8 {

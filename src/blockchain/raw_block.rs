@@ -1,7 +1,7 @@
 use std::mem::{size_of_val, size_of};
 use std::convert::AsRef;
 
-use super::super::primitive::{HASH_SIZE, PUBLIC_KEY_SIZE, SIGNATURE_SIZE};
+use crate::primitive::{HASH_SIZE, PUBLIC_KEY_SIZE, SIGNATURE_SIZE};
 
 use bincode::deserialize_from;
 

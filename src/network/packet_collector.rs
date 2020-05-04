@@ -1,12 +1,11 @@
-use super::TEST_STOP_DELAY_SEC;
-use super::packet::Packet;
-
 use log::{debug, info, warn};
 use std::sync::mpsc::{Receiver, SyncSender, TrySendError};
 use std::time::Duration;
 
 use csp2p_rs::RawPacket;
 
+use super::TEST_STOP_DELAY_SEC;
+use super::packet::Packet;
 use super::validator::Validator;
 
 pub struct PacketCollector {

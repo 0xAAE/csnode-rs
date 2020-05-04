@@ -7,18 +7,18 @@ use std::cmp::{max, min};
 
 use log::{debug, info, warn, error};
 
-use super::config::SharedConfig;
-use super::PublicKey;
-use super::{NODE_VERSION, UUID_TESTNET};
-use super::network::packet::{Flags, Packet};
-use super::blockchain::SharedBlocks;
-use super::core_logic::SharedRound;
+use crate::config::SharedConfig;
+use crate::PublicKey;
+use crate::{NODE_VERSION, UUID_TESTNET};
+use crate::network::packet::{Flags, Packet};
+use crate::blockchain::SharedBlocks;
+use crate::core_logic::SharedRound;
 
 use bincode::{serialize_into, deserialize_from};
 use base58::ToBase58; // [u8].to_base58()
 
-type Command = super::network::packet::NghbrCmd;
-type Message = super::network::packet::MsgType;
+type Command = crate::network::packet::NghbrCmd;
+type Message = crate::network::packet::MsgType;
 
 mod block_sync;
 use block_sync::BlockSync;
