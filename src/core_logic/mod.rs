@@ -31,10 +31,10 @@ impl CoreLogic {
 
     pub fn new(conf: SharedConfig, tx_send: Sender<Packet>, blocks: SharedBlocks, round: SharedRound) -> CoreLogic {
         CoreLogic {
-            tx_send: tx_send,
+            tx_send,
             config: conf,
-            round: round,
-            blocks: blocks
+            round,
+            blocks
         }
     }
 

@@ -1,17 +1,17 @@
 use super::raw_block::RawBlock;
 
 extern crate rkv;
-use rkv::{Manager, Rkv, SingleStore, Value, StoreOptions, EnvironmentBuilder, EnvironmentFlags, StoreError};
+use rkv::{Manager, Rkv, SingleStore, Value, StoreOptions, EnvironmentBuilder, EnvironmentFlags}; // , StoreError
 use bincode::{deserialize_from, serialize_into};
 
 use std::fs;
 use std::path::Path;
 use std::sync::{RwLock, Arc};
-use std::mem::{size_of_val, size_of};
-use std::io::Write;
+use std::mem::size_of; //{size_of_val, size_of};
+// use std::io::Write;
 use log::{info, error};
 
-static START_BLOCKCHAIN_SIZE: usize = 1 * 1024 * 1024 * 1024; // 1G
+static START_BLOCKCHAIN_SIZE: usize = 1024 * 1024 * 1024; // 1G
 static INCREASE_BLOCKCHAIN_SIZE: usize = 500 * 1024 * 1024; // 500M
 static START_BLOCKCACHE_SIZE: usize = 10 * 1024 * 1024; // 10M
 static INCREASE_BLOCKCACHE_SIZE: usize = 5 * 1024 * 1024; // 5M
@@ -279,28 +279,25 @@ impl Blocks {
                                 match v {
                                     None => (),
                                     Some(value) => {
-                                        match value {
-                                            Value::Blob(bytes) => {
-                                                let ret = RawBlock::new_from_bytes(bytes);
-                                                // re-assign cache_front
-                                                match it.next() {
-                                                    None => {
-                                                        self.cache_front = u64::max_value();
-                                                    },
-                                                    Some(res) => {
-                                                        match res {
-                                                            Err(_) => {
-                                                                self.cache_front = u64::max_value();
-                                                            }
-                                                            Ok((k, _)) => {
-                                                                self.cache_front = deserialize_from(k).unwrap();
-                                                            }
+                                        if let Value::Blob(bytes) = value {
+                                            let ret = RawBlock::new_from_bytes(bytes);
+                                            // re-assign cache_front
+                                            match it.next() {
+                                                None => {
+                                                    self.cache_front = u64::max_value();
+                                                },
+                                                Some(res) => {
+                                                    match res {
+                                                        Err(_) => {
+                                                            self.cache_front = u64::max_value();
+                                                        }
+                                                        Ok((k, _)) => {
+                                                            self.cache_front = deserialize_from(k).unwrap();
                                                         }
                                                     }
                                                 }
-                                                return ret;       
-                                            },
-                                            _ => ()
+                                            }
+                                            return ret;       
                                         }
                                     }
                                 }

@@ -53,12 +53,12 @@ impl Collaboration {
 
     pub fn new(conf: SharedConfig, tx_send: Sender<Packet>, blocks: SharedBlocks, round: SharedRound) -> Collaboration {
         Collaboration {
-            tx_send: tx_send,
+            tx_send,
             sequence: 0,
             neighbours: RwLock::new(HashMap::<PublicKey, PeerInfo>::new()),
             config: conf,
-            blocks: blocks,
-            round: round,
+            blocks,
+            round,
             sync: BlockSync::new()
         }
     }
@@ -210,7 +210,6 @@ impl Collaboration {
         match unpack_peer_info(input) {
             Err(e) => {
                 warn!("failed to unpack remote peer info: {}", e);
-                return;
             },
             Ok(peer_info) => {
                 if !self.try_add_peer(sender, peer_info) {
@@ -268,20 +267,18 @@ impl Collaboration {
         match unpack_peer_update(input) {
             Err(e) => {
                 warn!("faile to unpack remote peer update: {}", e);
-                return;
-            }
+            },
             Ok(data) => {
                 if !self.try_update_peer(sender, &data) {
                     debug!("{} is not updated", sender.to_base58());
                 }
                 else {
-                    let s: String;
-                    if data.1 >= data.0 {
-                        s = format!("+{}", &data.1 - &data.0);
+                    let s: String = if data.1 >= data.0 {
+                        format!("+{}", data.1 - data.0)
                     }
                     else {
-                        s = format!("-{}", &data.0 - &data.1);
-                    }
+                        format!("-{}", data.0 - data.1)
+                    };
                     debug!("{}: S {}, R {}, {}", sender.to_base58(), data.0, data.1, s);
                 }
             }
@@ -348,16 +345,14 @@ impl Collaboration {
 
         let mut guard = self.neighbours.write().unwrap();
         let info = guard.get_mut(key).unwrap();
-        let mut updated = false;
-        if info.sequence < data.0 {
+
+        if info.sequence < data.0 || info.round < data.1 {
             info.sequence = data.0;
-            updated = true;
-        }
-        if info.round < data.1 {
             info.round = data.1;
-            updated = true;
+            true
+        } else {
+            false
         }
-        updated
     }
 
     fn try_add_peer(&mut self, key: &PublicKey, peer_info: PeerInfo) -> bool {

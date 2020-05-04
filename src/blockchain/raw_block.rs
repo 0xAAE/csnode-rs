@@ -10,7 +10,7 @@ pub struct RawBlock {
 }
 
 static OFFSET_SEQUENCE: usize =
-    size_of::<u8>() + // blcok version
+    size_of::<u8>() + // block version
     1 + HASH_SIZE; // prev hash (1b size + 32b)
 
 impl RawBlock {
@@ -70,7 +70,7 @@ impl AsRef<[u8]> for RawBlock {
             return &self.data[OFFSET_SEQUENCE..OFFSET_SEQUENCE + size_of::<u64>()];
         }
         // empty slice only :-(
-        return &self.data[..]
+        &self.data[..]
     }
 }
 
@@ -174,12 +174,12 @@ pub fn validate_raw_block(bytes: &[u8]) -> Option<usize> {
 /// validates set of user fields as serialized to byte stream starting from the begining; suppose the [0] byte is user fields count in stream
 /// returns:
 /// None if failed to validate
-/// Some(pos) if validation succesful, pos is the position immediately after the block
+/// Some(pos) if validation succesful, pos is the position immediately after the user fields
 pub fn validate_user_fields(bytes: &[u8]) -> Option<usize> {
-    let total = bytes.len();
-    if total <= 0 {
+    if bytes.is_empty() {
         return None;
     }
+    let total = bytes.len();
     let count: usize = bytes[0] as usize;
     let mut pos = 1usize;
     for _ in 0..count {

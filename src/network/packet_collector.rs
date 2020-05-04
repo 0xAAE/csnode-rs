@@ -21,9 +21,9 @@ impl PacketCollector {
 
 	pub fn new(rx_raw: Receiver<RawPacket>, tx_cmd: SyncSender<Packet>, tx_msg: SyncSender<Packet>) -> PacketCollector {
 		PacketCollector {
-			rx_raw: rx_raw,
-			tx_cmd: tx_cmd,
-			tx_msg: tx_msg,
+			rx_raw,
+			tx_cmd,
+			tx_msg,
 			validator: Validator::new()
 		}
 	}

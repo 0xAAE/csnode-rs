@@ -21,7 +21,7 @@ impl MessageProcessor {
 
     pub fn new(conf: SharedConfig, rx_msg: Receiver<Packet>, tx_send:Sender<Packet>, blocks: SharedBlocks, round: SharedRound) -> MessageProcessor {
         MessageProcessor {
-            rx_msg: rx_msg,
+            rx_msg,
             tx_send: tx_send.clone(),
             logic: CoreLogic::new(conf, tx_send, blocks, round)
         }
@@ -36,15 +36,12 @@ impl MessageProcessor {
                         warn!("unknown message, drop");
                     },
                     Some(mt) => {
-                        match mt {
+                       if mt == MsgType::RequestedBlock {
                             // actually only particular packets use compression despite of
                             // Flags::Compressed value
-                            MsgType::RequestedBlock => {
-                                if p.is_compressed() {
-                                    p = p.decompress();
-                                }        
-                            },
-                            _ => ()
+                            if p.is_compressed() {
+                                p = p.decompress();
+                            }        
                         }
 
                         match p.round() {

@@ -3,7 +3,7 @@ use super::super::{PublicKey};
 //use super::super::blake2s_simd::Hash;
 use std::convert::{TryInto, TryFrom};
 use std::fmt;
-use std::mem::{size_of, size_of_val};
+//use std::mem::{size_of, size_of_val};
 use log::warn;
 
 extern crate csp2p_rs;
@@ -151,21 +151,21 @@ impl Packet {
 	}
 
 	pub fn is_neigbour(&self) -> bool {
-		if self.data.len() == 0 {
+		if self.data.is_empty() {
 			return false;
 		}
 		check_flag(self.data[0], Flags::N)
 	}
 
 	pub fn is_signed(&self) -> bool {
-		if self.data.len() == 0 {
+		if self.data.is_empty() {
 			return false;
 		}
 		check_flag(self.data[0], Flags::S)
 	}
 
 	pub fn is_compressed(&self) -> bool {
-		if self.data.len() == 0 {
+		if self.data.is_empty() {
 			return false;
 		}
 		check_flag(self.data[0], Flags::C)
@@ -248,13 +248,7 @@ impl Packet {
 		}
 
 		let mut buf = Vec::<u8>::new();
-		let mut pos: usize;
-		if self.is_neigbour() {
-			pos = 2;
-		}
-		else {
-			pos = 10;
-		}
+		let mut pos: usize = if self.is_neigbour() { 2 } else { 10 };
 		buf.extend_from_slice(&self.data[..pos]);
 		let decompressed_size: u64 = deserialize_from(&self.data[pos..]).unwrap();
 		pos += std::mem::size_of_val(&decompressed_size);

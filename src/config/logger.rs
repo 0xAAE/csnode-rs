@@ -24,11 +24,8 @@ impl Data {
 	pub fn update_core(&mut self, prop: &HashMap<String, String>) -> bool {
 		let mut updated = false;
 		for (k, v) in prop.iter() {
-			match k.as_str() {
-				"Filter" => {
-					updated = Data::update_level(&mut self.min_level, v);
-				}
-				_ => ()
+			if k.as_str() == "Filter" {
+				updated = Data::update_level(&mut self.min_level, v);
 			}
 		}
 		updated
@@ -37,11 +34,8 @@ impl Data {
 	pub fn update_console(&mut self, prop: &HashMap<String, String>) -> bool {
 		let mut updated = false;
 		for (k, v) in prop.iter() {
-			match k.as_str() {
-				"Filter" => {
-					updated = Data::update_level(&mut self.min_console_level, v);
-				}
-				_ => ()
+			if k.as_str() == "Filter" {
+				updated = Data::update_level(&mut self.min_console_level, v);
 			}
 		}
 		updated
@@ -50,11 +44,8 @@ impl Data {
 	pub fn update_file(&mut self, prop: &HashMap<String, String>) -> bool {
 		let mut updated = false;
 		for (k, v) in prop.iter() {
-			match k.as_str() {
-				"Filter" => {
-					updated = Data::update_level(&mut self.min_file_level, v);
-				}
-				_ => ()
+			if k.as_str() == "Filter" {
+				updated = Data::update_level(&mut self.min_file_level, v);
 			}
 		}
 		updated
@@ -92,7 +83,7 @@ impl Data {
 				return Some(LevelFilter::Error);
 			}
 		}
-		return None;
+		None
 	}
 }
 

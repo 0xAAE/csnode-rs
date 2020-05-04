@@ -7,18 +7,12 @@ pub struct Validator {
 impl Validator {
 
     pub fn new() -> Validator {
-        return Validator {
-
+        Validator {
         }
     }
 
     pub fn validate(&self, packet: &Packet) -> bool {
-        if !packet.is_neigbour() {
-            if packet.round().is_none() {
-                // malformed message: does not contain round
-                return false;
-            }
-        }
-        true
+        // wellformed message has to contain round
+        packet.is_neigbour() || packet.round().is_some()
     }
 }

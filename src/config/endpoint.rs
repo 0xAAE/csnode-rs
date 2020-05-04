@@ -47,7 +47,7 @@ impl Data {
 							warn!("IP address parse error");
 						}
 						Ok(addr) => {
-							if &self.ip != &addr {
+							if self.ip != addr {
 								debug!("{} is updated: {} -> {}", k, &self.ip, &v);
 								self.ip = addr;
 								updated = true;

@@ -80,52 +80,49 @@ impl Config {
 	}
 
 	pub fn reload(&mut self) {
-		match Ini::load_from_file(&self.ini_file) {
-			Ok(ini) => {
-				for (sec, prop) in ini.iter() {
-					match sec.as_ref().map(String::as_str) {
-						Some("params") => {
-							self.update(prop);
-						}
-						Some("start_node") => {
-							self.start_node.update(prop);
-						}
-						Some("host_input") => {
-							self.host_input.update(prop);
-						}
-						Some("api") => {
-							self.api.update(prop);
-						}
-						Some("conveyer") => {
-							self.conveyer.update(prop);
-						}
-						Some("pool_sync") => {
-							self.sync.update(prop);
-						}
-						Some("event_report") => {
-							self.events.update(prop);
-						}
-						Some("dbsql") => {
-							self.sql.update(prop);
-						}
-						Some("Core") => {
-							self.logger.update_core(prop);
-						}
-						Some("Sinks.Console") => {
-							self.logger.update_console(prop);
-						}
-						Some("Sinks.File") => {
-							self.logger.update_file(prop);
-						}
-						//Some("Sinks.Event") => {}
-						Some(s) => {
-							trace!("ignore {} section", s);
-						},
-						None => {}
-					};
-				}
+		if let Ok(ini) = Ini::load_from_file(&self.ini_file) {
+			for (sec, prop) in ini.iter() {
+				match sec.as_ref().map(String::as_str) {
+					Some("params") => {
+						self.update(prop);
+					}
+					Some("start_node") => {
+						self.start_node.update(prop);
+					}
+					Some("host_input") => {
+						self.host_input.update(prop);
+					}
+					Some("api") => {
+						self.api.update(prop);
+					}
+					Some("conveyer") => {
+						self.conveyer.update(prop);
+					}
+					Some("pool_sync") => {
+						self.sync.update(prop);
+					}
+					Some("event_report") => {
+						self.events.update(prop);
+					}
+					Some("dbsql") => {
+						self.sql.update(prop);
+					}
+					Some("Core") => {
+						self.logger.update_core(prop);
+					}
+					Some("Sinks.Console") => {
+						self.logger.update_console(prop);
+					}
+					Some("Sinks.File") => {
+						self.logger.update_file(prop);
+					}
+					//Some("Sinks.Event") => {}
+					Some(s) => {
+						trace!("ignore {} section", s);
+					},
+					None => {}
+				};
 			}
-			Err(_) => ()
 		}
 	}
 
@@ -197,7 +194,7 @@ fn test_update_params() {
 	assert_eq!(conf.update(&data), false);
 }
 
-fn try_parse<N: FromStr + PartialEq + Copy + Display>(param: &mut N, key: &String, val: &String) -> bool {
+fn try_parse<N: FromStr + PartialEq + Copy + Display>(param: &mut N, key: &str, val: &str) -> bool {
 	match val.parse::<N>() {
 		Err(_) => {
 			warn!("error in {} value: it must be valid for {} type", key, std::any::type_name::<N>());
@@ -213,7 +210,7 @@ fn try_parse<N: FromStr + PartialEq + Copy + Display>(param: &mut N, key: &Strin
 	false
 }
 
-fn try_update(param: &mut String, key: &String, val: &String) -> bool {
+fn try_update(param: &mut String, key: &str, val: &str) -> bool {
 	if param != val {
 		debug!("{} is updated: {} -> {}", key, &param, val);
 		*param = val.to_string();

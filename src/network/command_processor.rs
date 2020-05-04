@@ -21,7 +21,7 @@ impl CommandProcessor {
 
     pub fn new(conf: SharedConfig, rx_cmd: Receiver<Packet>, tx_send: Sender<Packet>, blocks: SharedBlocks, round: SharedRound) -> CommandProcessor {
         CommandProcessor {
-            rx_cmd: rx_cmd,
+            rx_cmd,
             collaboration: Collaboration::new(conf, tx_send, blocks, round)
         }
     }

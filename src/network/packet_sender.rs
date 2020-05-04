@@ -19,7 +19,7 @@ pub struct PacketSender {
 impl PacketSender {
     pub fn new(rx_send: Receiver<Packet>) -> PacketSender {
         PacketSender {
-            rx_send: rx_send
+            rx_send
         }
     }
 

@@ -2,7 +2,7 @@ use super::config::SharedConfig;
 use std::thread::{JoinHandle, spawn};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{channel, sync_channel, Receiver, SyncSender, Sender};
+use std::sync::mpsc::{channel, sync_channel, Receiver, SyncSender}; // , Sender
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::prelude::*;
@@ -82,16 +82,16 @@ impl Network {
         let msg_processor = MessageProcessor::new(conf.clone(), rx_msg, tx_send.clone(), blocks.clone(), round.clone());
         let neighbourhood = CommandProcessor::new(conf.clone(), rx_cmd, tx_send, blocks, round);
 
-		let instance = Box::new(
+		Box::new(
             Network {
                 stop_flag: stop_flag_instance.clone(),
                 collect_thread: start_collect(conf.clone(), stop_flag_instance.clone(), rx_raw, tx_cmd, tx_msg),
                 neighbours_thread: start_neighbourhood(stop_flag_instance.clone(), neighbourhood),
                 processor_thread: start_msg_processor(stop_flag_instance.clone(), msg_processor),
-                sender_thread: start_sender(conf.clone(), stop_flag_instance.clone(), rx_send),
-                host: host
-            });
-		instance
+                sender_thread: start_sender(conf, stop_flag_instance, rx_send),
+                host
+            }
+        )
 	}
 
 	pub fn stop(mut self) {
@@ -109,7 +109,7 @@ fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>,
         tx_cmd: SyncSender<Packet>,
         tx_msg: SyncSender<Packet>) -> JoinHandle<()> {
 	info!("Start packet collector");
-	let handle = spawn(move || {
+	spawn(move || {
 		info!("Packet collector started");
 		let packet_collector = packet_collector::PacketCollector::new(rx_raw, tx_cmd, tx_msg);
         loop {
@@ -119,13 +119,12 @@ fn start_collect(_conf: SharedConfig, stop_flag: Arc<AtomicBool>,
             }
         }
         info!("Packet collector stopped");
-	});
-	handle
+	})
 }
 
 fn start_neighbourhood(stop_flag: Arc<AtomicBool>, mut neighbourhood: CommandProcessor) -> JoinHandle<()> {
 	info!("Start neighbourhood service");
-	let handle = spawn(move || {
+	spawn(move || {
         info!("Neighbourhood started");
         
         let mut prev_ping = Instant::now();
@@ -141,13 +140,12 @@ fn start_neighbourhood(stop_flag: Arc<AtomicBool>, mut neighbourhood: CommandPro
             }
         }
         info!("Neighbourhood stopped");
-	});
-	handle
+	})
 }
 
 fn start_msg_processor(stop_flag: Arc<AtomicBool>, mut msg_processor: MessageProcessor) -> JoinHandle<()> {
 	info!("Start message processor");
-	let handle = spawn(move || {
+	spawn(move || {
         info!("Message processor started");
         loop {
             msg_processor.recv();
@@ -156,13 +154,12 @@ fn start_msg_processor(stop_flag: Arc<AtomicBool>, mut msg_processor: MessagePro
             }
         }
         info!("Message processor stopped");
-	});
-	handle
+	})
 }
 
 fn start_sender(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_send: Receiver<Packet>) -> JoinHandle<()> {
 	info!("Start packet sender");
-	let handle = spawn(move || {
+	spawn(move || {
         info!("Packet sender started");
         let packet_sender = packet_sender::PacketSender::new(rx_send);
         loop {
@@ -172,12 +169,11 @@ fn start_sender(_conf: SharedConfig, stop_flag: Arc<AtomicBool>, rx_send: Receiv
             }
         }
         info!("Packet sender stopped");
-	});
-	handle
+	})
 }
 
-fn parse_known_hosts_or_default(known_hosts: &mut Vec<NodeInfo>, hosts_filename: &String) {
-    if hosts_filename.len() > 0 {
+fn parse_known_hosts_or_default(known_hosts: &mut Vec<NodeInfo>, hosts_filename: &str) {
+    if !hosts_filename.is_empty() {
         match File::open(PathBuf::from(&hosts_filename)) {
             Err(e) => {
                 println!("Failed to open file {}: {}", &hosts_filename, e);
