@@ -1,5 +1,5 @@
 #[cfg(test)]
-use super::raw_block::{validate_user_fields, validate_transaction, validate_raw_block};
+use super::raw_block::{validate_raw_block, validate_transaction, validate_user_fields};
 #[cfg(test)]
 use crate::primitive::{HASH_SIZE, PUBLIC_KEY_SIZE, SIGNATURE_SIZE};
 #[cfg(test)]
@@ -37,14 +37,12 @@ fn mock_serialize_transaction_to(bytes: &mut Vec<u8>, src_id: bool, tgt_id: bool
     serialize_into(bytes.by_ref(), &hi).unwrap();
     if src_id {
         serialize_into(bytes.by_ref(), &55u32).unwrap();
-    }
-    else {
+    } else {
         bytes.extend_from_slice(&[211u8; PUBLIC_KEY_SIZE]);
     }
     if tgt_id {
         serialize_into(bytes.by_ref(), &88u32).unwrap();
-    }
-    else {
+    } else {
         bytes.extend_from_slice(&[212u8; PUBLIC_KEY_SIZE]);
     }
     serialize_into(bytes.by_ref(), &19u32).unwrap();

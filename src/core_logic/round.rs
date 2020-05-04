@@ -1,6 +1,6 @@
-use std::time::Instant;
+use log::info;
 use std::sync::{Arc, RwLock};
-use log::{info};
+use std::time::Instant;
 
 use num_format::{Locale, ToFormattedString};
 pub type SharedRound = Arc<RwLock<Round>>;
@@ -12,14 +12,13 @@ pub struct Round {
     first_start: Instant,
     // current round
     current: u64,
-    // time point current round started  
+    // time point current round started
     current_start: Instant,
     // average round duration
-    ave_duration: u64
+    ave_duration: u64,
 }
 
 impl Round {
-
     pub fn new() -> Round {
         let now = Instant::now();
         Round {
@@ -27,7 +26,7 @@ impl Round {
             first_start: now,
             current: 0,
             current_start: now,
-            ave_duration: 0
+            ave_duration: 0,
         }
     }
 
@@ -51,10 +50,16 @@ impl Round {
             self.ave_duration = uptime_ms / (self.current - self.first);
         }
 
-
-        
-        info!("-------------------------- R: {} --------------------------", rnd.to_formatted_string(&Locale::ru));
-        info!("last round: {} ms, ave: {} ms, uptime: {}", current_duration.as_millis(), self.ave_duration, format_ms(uptime_ms));
+        info!(
+            "-------------------------- R: {} --------------------------",
+            rnd.to_formatted_string(&Locale::ru)
+        );
+        info!(
+            "last round: {} ms, ave: {} ms, uptime: {}",
+            current_duration.as_millis(),
+            self.ave_duration,
+            format_ms(uptime_ms)
+        );
         true
     }
 }

@@ -7,13 +7,13 @@ use config::SharedConfig;
 mod logger;
 mod network;
 use network::TEST_STOP_DELAY_SEC;
+mod blockchain;
 mod collaboration;
 mod core_logic;
-mod blockchain;
 use blockchain::{SharedBlocks, SharedCaches};
 
-use std::sync::{Arc, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, RwLock};
 use std::thread;
 use std::thread::spawn;
 use std::thread::JoinHandle;
@@ -41,7 +41,7 @@ fn main() {
 
     let stop_flag = Arc::new(AtomicBool::new(false));
     let conf: SharedConfig = Arc::new(RwLock::new(config::Config::new(&file_name)));
-    
+
     // init logger
     logger::init(conf.clone());
 
@@ -50,7 +50,7 @@ fn main() {
 
     // init current state
     let _caches: SharedCaches = Arc::new(RwLock::new(blockchain::caches::Caches::new()));
-    
+
     // run config observer thread:
     let config_observer = start_config_observer_thread(conf.clone(), stop_flag.clone());
 
@@ -68,7 +68,10 @@ fn main() {
     info!("Node exit. The last written block is {}", b.top());
 }
 
-fn start_config_observer_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>) -> JoinHandle<()> {
+fn start_config_observer_thread(
+    config: SharedConfig,
+    stop_flag: Arc<AtomicBool>,
+) -> JoinHandle<()> {
     info!("Start logger");
     spawn(move || {
         info!("Logger started");
@@ -98,7 +101,11 @@ fn start_config_observer_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>
     })
 }
 
-fn start_network_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>, blocks: SharedBlocks) -> JoinHandle<()> {
+fn start_network_thread(
+    config: SharedConfig,
+    stop_flag: Arc<AtomicBool>,
+    blocks: SharedBlocks,
+) -> JoinHandle<()> {
     info!("Start network");
     spawn(move || {
         let net = network::Network::new(config, blocks);
@@ -110,7 +117,7 @@ fn start_network_thread(config: SharedConfig, stop_flag: Arc<AtomicBool>, blocks
             }
         }
         info!("Trying to stop network");
-		net.stop();
+        net.stop();
         info!("Network stopped");
     })
 }

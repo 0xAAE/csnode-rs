@@ -1,14 +1,10 @@
 use super::packet::Packet;
 
-pub struct Validator {
-
-}
+pub struct Validator {}
 
 impl Validator {
-
     pub fn new() -> Validator {
-        Validator {
-        }
+        Validator {}
     }
 
     pub fn validate(&self, packet: &Packet) -> bool {

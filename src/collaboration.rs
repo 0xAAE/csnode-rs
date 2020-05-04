@@ -1,21 +1,21 @@
-use std::sync::mpsc::Sender;
-use std::io::Write;
-use std::collections::HashMap;
-use std::sync::RwLock;
-use std::mem::size_of_val;
 use std::cmp::{max, min};
+use std::collections::HashMap;
+use std::io::Write;
+use std::mem::size_of_val;
+use std::sync::mpsc::Sender;
+use std::sync::RwLock;
 
-use log::{debug, info, warn, error};
+use log::{debug, error, info, warn};
 
+use crate::blockchain::SharedBlocks;
 use crate::config::SharedConfig;
+use crate::core_logic::SharedRound;
+use crate::network::packet::{Flags, Packet};
 use crate::PublicKey;
 use crate::{NODE_VERSION, UUID_TESTNET};
-use crate::network::packet::{Flags, Packet};
-use crate::blockchain::SharedBlocks;
-use crate::core_logic::SharedRound;
 
-use bincode::{serialize_into, deserialize_from};
-use base58::ToBase58; // [u8].to_base58()
+use base58::ToBase58;
+use bincode::{deserialize_from, serialize_into}; // [u8].to_base58()
 
 type Command = crate::network::packet::NghbrCmd;
 type Message = crate::network::packet::MsgType;
@@ -34,7 +34,7 @@ struct PeerInfo {
     /// the last repported consensus round
     round: u64,
     /// requires to be persistent
-    persistent: bool
+    persistent: bool,
 }
 
 pub struct Collaboration {
@@ -44,12 +44,16 @@ pub struct Collaboration {
     config: SharedConfig,
     blocks: SharedBlocks,
     round: SharedRound,
-    sync: BlockSync
+    sync: BlockSync,
 }
 
 impl Collaboration {
-
-    pub fn new(conf: SharedConfig, tx_send: Sender<Packet>, blocks: SharedBlocks, round: SharedRound) -> Collaboration {
+    pub fn new(
+        conf: SharedConfig,
+        tx_send: Sender<Packet>,
+        blocks: SharedBlocks,
+        round: SharedRound,
+    ) -> Collaboration {
         Collaboration {
             tx_send,
             sequence: 0,
@@ -57,7 +61,7 @@ impl Collaboration {
             config: conf,
             blocks,
             round,
-            sync: BlockSync::new()
+            sync: BlockSync::new(),
         }
     }
 
@@ -69,7 +73,7 @@ impl Collaboration {
             Command::Ping => self.handle_ping(sender, bytes),
             Command::Pong => self.handle_pong(sender, bytes),
             Command::NodeFound => self.handle_node_found(sender),
-            Command::NodeLost => self.handle_node_lost(sender)
+            Command::NodeLost => self.handle_node_lost(sender),
         };
     }
 
@@ -82,24 +86,20 @@ impl Collaboration {
             match pack_ping(&mut output) {
                 Err(_) => {
                     error!("failed to serialize ping info");
-                },
-                Ok(_) => {
-                    match Packet::new(*node_id, output) {
-                        None => {
-                            error!("failed create ping packet");
-                        },
-                        Some(pack) => {
-                            match self.tx_send.send(pack) {
-                                Err(e) => {
-                                    warn!("failed send ping packet to {}: {}", node_id.to_base58(), e);
-                                },
-                                Ok(_) => {
-                                    debug!("transfer ping packet to {}", node_id.to_base58());
-                                }
-                            }
-                        }
-                    }
                 }
+                Ok(_) => match Packet::new(*node_id, output) {
+                    None => {
+                        error!("failed create ping packet");
+                    }
+                    Some(pack) => match self.tx_send.send(pack) {
+                        Err(e) => {
+                            warn!("failed send ping packet to {}: {}", node_id.to_base58(), e);
+                        }
+                        Ok(_) => {
+                            debug!("transfer ping packet to {}", node_id.to_base58());
+                        }
+                    },
+                },
             }
             max_block = max(max_block, info.sequence);
         }
@@ -121,14 +121,14 @@ impl Collaboration {
             let begin = blocks_top + 1;
             let end = min(begin + max_allowed_request, max_block);
             let mut bytes = Vec::<u8>::new();
-            serialize_into(&mut bytes, &0u8).unwrap();                              // no flags
-            serialize_into(&mut bytes, &(Message::BlockRequest as u8)).unwrap();    // message
-            serialize_into(&mut bytes, &current_round).unwrap();                    // round
-            // requested blocks sequences
+            serialize_into(&mut bytes, &0u8).unwrap(); // no flags
+            serialize_into(&mut bytes, &(Message::BlockRequest as u8)).unwrap(); // message
+            serialize_into(&mut bytes, &current_round).unwrap(); // round
+                                                                 // requested blocks sequences
             let cnt = end - begin;
             serialize_into(&mut bytes, &cnt).unwrap();
             for s in begin..end {
-                serialize_into(&mut bytes, &s).unwrap();                            
+                serialize_into(&mut bytes, &s).unwrap();
             }
 
             for (node_id, peer) in all.iter() {
@@ -136,17 +136,19 @@ impl Collaboration {
                     match Packet::new(*node_id, bytes) {
                         None => {
                             error!("failed create packet to request blocks");
-                        },
-                        Some(pack) => {
-                            match self.tx_send.send(pack) {
-                                Err(e) => {
-                                    warn!("failed transfer request for blocks to {}: {}", node_id.to_base58(), e);
-                                },
-                                Ok(_) => {
-                                    debug!("transfer request for blocks to {}", node_id.to_base58());
-                                }
-                            }
                         }
+                        Some(pack) => match self.tx_send.send(pack) {
+                            Err(e) => {
+                                warn!(
+                                    "failed transfer request for blocks to {}: {}",
+                                    node_id.to_base58(),
+                                    e
+                                );
+                            }
+                            Ok(_) => {
+                                debug!("transfer request for blocks to {}", node_id.to_base58());
+                            }
+                        },
                     }
                     break;
                 }
@@ -154,37 +156,29 @@ impl Collaboration {
         }
     }
 
-    fn handle_error(&self, _sender: &PublicKey, _bytes: Option<&[u8]>) {
-
-    }
+    fn handle_error(&self, _sender: &PublicKey, _bytes: Option<&[u8]>) {}
 
     fn handle_version_request(&self, sender: &PublicKey, _bytes: Option<&[u8]>) {
-        let current_round = {
-            self.round.read().unwrap().current()
-        };
+        let current_round = { self.round.read().unwrap().current() };
         // send version reply:
         let mut output: Vec<u8> = Vec::<u8>::new();
         match pack_version_reply(&mut output, self.sequence, current_round) {
             Err(_) => {
                 error!("failed to serialize version reply");
-            },
-            Ok(_) => {
-                match Packet::new(*sender, output) {
-                    None => {
-                        error!("failed create version reply packet");
-                    },
-                    Some(pack) => {
-                        match self.tx_send.send(pack) {
-                            Err(e) => {
-                                warn!("failed send version reply packet: {}", e);
-                            },
-                            Ok(_) => {
-                                debug!("transfer version reply packet");
-                            }
-                        }
-                    }
-                }
             }
+            Ok(_) => match Packet::new(*sender, output) {
+                None => {
+                    error!("failed create version reply packet");
+                }
+                Some(pack) => match self.tx_send.send(pack) {
+                    Err(e) => {
+                        warn!("failed send version reply packet: {}", e);
+                    }
+                    Ok(_) => {
+                        debug!("transfer version reply packet");
+                    }
+                },
+            },
         }
     }
 
@@ -197,7 +191,11 @@ impl Collaboration {
         let req_len = 2 + 8 + 8 + 8; // ver + uuid + seq + round
         let input = bytes.unwrap();
         if input.len() < req_len {
-            warn!("inconsistent version reply payload, required {} bytes, actual {}", req_len, input.len());
+            warn!(
+                "inconsistent version reply payload, required {} bytes, actual {}",
+                req_len,
+                input.len()
+            );
             return;
         }
         /*
@@ -208,12 +206,11 @@ impl Collaboration {
         match unpack_peer_info(input) {
             Err(e) => {
                 warn!("failed to unpack remote peer info: {}", e);
-            },
+            }
             Ok(peer_info) => {
                 if !self.try_add_peer(sender, peer_info) {
                     debug!("new peer info rejected");
-                }
-                else {
+                } else {
                     let guard = self.neighbours.read().unwrap();
                     info!("add new neighbour, now total {}", guard.len());
                 }
@@ -222,32 +219,26 @@ impl Collaboration {
     }
 
     fn handle_ping(&self, sender: &PublicKey, _bytes: Option<&[u8]>) {
-        let current_round = {
-            self.round.read().unwrap().current()
-        };
+        let current_round = { self.round.read().unwrap().current() };
         // send pong:
         let mut output: Vec<u8> = Vec::<u8>::new();
         match pack_pong(&mut output, self.sequence, current_round) {
             Err(_) => {
                 error!("failed to serialize pong");
-            },
-            Ok(_) => {
-                match Packet::new(*sender, output) {
-                    None => {
-                        error!("failed create pong packet");
-                    },
-                    Some(pack) => {
-                        match self.tx_send.send(pack) {
-                            Err(e) => {
-                                warn!("failed send pong packet: {}", e);
-                            },
-                            Ok(_) => {
-                                debug!("transfer pong packet");
-                            }
-                        }
-                    }
-                }
             }
+            Ok(_) => match Packet::new(*sender, output) {
+                None => {
+                    error!("failed create pong packet");
+                }
+                Some(pack) => match self.tx_send.send(pack) {
+                    Err(e) => {
+                        warn!("failed send pong packet: {}", e);
+                    }
+                    Ok(_) => {
+                        debug!("transfer pong packet");
+                    }
+                },
+            },
         }
     }
 
@@ -259,22 +250,24 @@ impl Collaboration {
         let req_len = 8 + 8; // sequence + round
         let input = bytes.unwrap();
         if input.len() < req_len {
-            warn!("inconsistent pong payload, required {} bytes, actual {}", req_len, input.len());
+            warn!(
+                "inconsistent pong payload, required {} bytes, actual {}",
+                req_len,
+                input.len()
+            );
             return;
         }
         match unpack_peer_update(input) {
             Err(e) => {
                 warn!("faile to unpack remote peer update: {}", e);
-            },
+            }
             Ok(data) => {
                 if !self.try_update_peer(sender, &data) {
                     debug!("{} is not updated", sender.to_base58());
-                }
-                else {
+                } else {
                     let s: String = if data.1 >= data.0 {
                         format!("+{}", data.1 - data.0)
-                    }
-                    else {
+                    } else {
                         format!("-{}", data.0 - data.1)
                     };
                     debug!("{}: S {}, R {}, {}", sender.to_base58(), data.0, data.1, s);
@@ -289,24 +282,20 @@ impl Collaboration {
         match pack_version_request(&mut output) {
             Err(_) => {
                 error!("failed to serialize version request");
-            },
-            Ok(_) => {
-                match Packet::new(*node_id, output) {
-                    None => {
-                        error!("failed create version request packet");
-                    },
-                    Some(pack) => {
-                        match self.tx_send.send(pack) {
-                            Err(e) => {
-                                warn!("failed send version request packet: {}", e);
-                            },
-                            Ok(_) => {
-                                debug!("transfer version request packet");
-                            }
-                        }
-                    }
-                }
             }
+            Ok(_) => match Packet::new(*node_id, output) {
+                None => {
+                    error!("failed create version request packet");
+                }
+                Some(pack) => match self.tx_send.send(pack) {
+                    Err(e) => {
+                        warn!("failed send version request packet: {}", e);
+                    }
+                    Ok(_) => {
+                        debug!("transfer version request packet");
+                    }
+                },
+            },
         }
     }
 
@@ -336,7 +325,7 @@ impl Collaboration {
     fn try_update_peer(&mut self, key: &PublicKey, data: &(u64, u64)) -> bool {
         {
             let guard = self.neighbours.read().unwrap();
-            if ! guard.contains_key(key) {
+            if !guard.contains_key(key) {
                 return false;
             }
         }
@@ -354,7 +343,6 @@ impl Collaboration {
     }
 
     fn try_add_peer(&mut self, key: &PublicKey, peer_info: PeerInfo) -> bool {
-
         let exists: bool;
         let count: usize;
         {
@@ -378,7 +366,10 @@ impl Collaboration {
 
             // test compatibility
             if peer_info.version < min_version {
-                debug!("peer version is incompatible: {} < {}, reject", peer_info.version, NODE_VERSION);
+                debug!(
+                    "peer version is incompatible: {} < {}, reject",
+                    peer_info.version, NODE_VERSION
+                );
                 return false;
             }
             if peer_info.uuid != UUID_TESTNET {
@@ -387,9 +378,12 @@ impl Collaboration {
             }
 
             // test selfability
-    
+
             if count >= max_neighbours {
-                debug!("max allowed neighbors {} has reached, reject", max_neighbours);
+                debug!(
+                    "max allowed neighbors {} has reached, reject",
+                    max_neighbours
+                );
                 return false;
             }
         }
@@ -414,8 +408,14 @@ fn sequencial_serialization() {
     let mut output = Vec::<u8>::new();
     let cmd_len = 1 + 1; // flags + cmd
     output.reserve(cmd_len);
-    assert_eq!(serialize_into(output.by_ref(), &Flags::N.bits()).unwrap(),());
-    assert_eq!(serialize_into(output.by_ref(), &(Command::VersionRequest as u8)).unwrap(), ());
+    assert_eq!(
+        serialize_into(output.by_ref(), &Flags::N.bits()).unwrap(),
+        ()
+    );
+    assert_eq!(
+        serialize_into(output.by_ref(), &(Command::VersionRequest as u8)).unwrap(),
+        ()
+    );
     let data = [1u8, 2u8, 3u8, 4u8, 5u8];
     for d in &data {
         assert_eq!(serialize_into(output.by_ref(), d).unwrap(), ());
@@ -425,7 +425,9 @@ fn sequencial_serialization() {
 
 #[test]
 fn sequencial_deserialization() {
-    let data = [1u8, 2u8, 255u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 16u8, 0u8, 0u8, 0u8];
+    let data = [
+        1u8, 2u8, 255u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 16u8, 0u8, 0u8, 0u8,
+    ];
     let input = &data[..];
 
     let mut pos = 0;
@@ -485,7 +487,7 @@ fn pack_pong(output: &mut Vec<u8>, sequence: u64, round: u64) -> bincode::Result
     serialize_into(output.by_ref(), &sequence)?;
     serialize_into(output.by_ref(), &round)?;
 
-    Ok(())    
+    Ok(())
 }
 
 fn unpack_peer_info(input: &[u8]) -> bincode::Result<PeerInfo> {
@@ -508,7 +510,7 @@ fn unpack_peer_info(input: &[u8]) -> bincode::Result<PeerInfo> {
     p += size_of_val(&peer_info.sequence);
     peer_info.round = deserialize_from(&input[p..])?;
     p += size_of_val(&peer_info.round);
-    
+
     assert_eq!(p, input.len());
     Ok(peer_info)
 }
