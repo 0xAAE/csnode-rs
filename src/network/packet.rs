@@ -6,15 +6,11 @@ use std::fmt;
 //use std::mem::{size_of, size_of_val};
 use log::warn;
 
-extern crate csp2p_rs;
 use csp2p_rs::{NodeId};
-
-extern crate num_enum;
 use num_enum::TryFromPrimitive;
-
-extern crate lz4;
 use lz4::liblz4::LZ4_decompress_safe;
 use bincode::deserialize_from;
+use bitflags::bitflags;
 
 bitflags! {
 	pub struct Flags: u8 {

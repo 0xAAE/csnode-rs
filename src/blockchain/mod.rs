@@ -5,7 +5,6 @@ pub mod caches;
 pub mod raw_block;
 mod raw_block_tests;
 
-//extern crate ruspiro_singleton;
 //use ruspiro_singleton::Singleton;
 
 pub type SharedBlocks = Arc<RwLock<blocks::Blocks>>;

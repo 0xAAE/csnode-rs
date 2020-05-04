@@ -1,6 +1,5 @@
 use super::raw_block::RawBlock;
 
-extern crate rkv;
 use rkv::{Manager, Rkv, SingleStore, Value, StoreOptions, EnvironmentBuilder, EnvironmentFlags}; // , StoreError
 use bincode::{deserialize_from, serialize_into};
 

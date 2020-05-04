@@ -11,10 +11,8 @@ use std::str::FromStr;
 use std::time::Instant;
 use log::info;
 
-extern crate base58;
 use base58::FromBase58;
 
-extern crate csp2p_rs;
 use csp2p_rs::{CSHost, NodeInfo, NodeId, RawPacket};
 
 pub const TEST_STOP_DELAY_SEC: u64 = 2;

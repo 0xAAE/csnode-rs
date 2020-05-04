@@ -5,7 +5,6 @@ use log::{debug, info, warn};
 use std::sync::mpsc::{Receiver, SyncSender, TrySendError};
 use std::time::Duration;
 
-extern crate csp2p_rs;
 use csp2p_rs::RawPacket;
 
 use super::validator::Validator;

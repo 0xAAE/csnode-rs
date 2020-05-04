@@ -1,11 +1,4 @@
-#[macro_use]
-extern crate bitflags;
-
-extern crate log;
 use log::info;
-
-extern crate blake2s_simd;
-extern crate rkv;
 
 mod primitive;
 use primitive::PublicKey; //{PublicKey, Hash, Signature};

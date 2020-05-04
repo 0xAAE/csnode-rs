@@ -14,9 +14,7 @@ use super::network::packet::{Flags, Packet};
 use super::blockchain::SharedBlocks;
 use super::core_logic::SharedRound;
 
-extern crate bincode;
 use bincode::{serialize_into, deserialize_from};
-extern crate base58;
 use base58::ToBase58; // [u8].to_base58()
 
 type Command = super::network::packet::NghbrCmd;
